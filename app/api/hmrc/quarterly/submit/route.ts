@@ -15,6 +15,10 @@ export async function POST(req:Request){
   back.searchParams.set('data',token)
   if(!p){back.searchParams.set('error','Review token is invalid or has been altered');return NextResponse.redirect(back,303)}
   if(!p.periodStart||p.periodStart<'2025-04-06'){back.searchParams.set('error','Cumulative quarterly submission requires tax year 2025/26 or later');return NextResponse.redirect(back,303)}
+  if(process.env.HMRC_ENVIRONMENT==='production'&&process.env.HMRC_ALLOW_PRODUCTION_SUBMISSIONS!=='true'){
+    back.searchParams.set('error','Production HMRC submissions are locked. Complete sandbox testing and explicitly enable production submissions first.')
+    return NextResponse.redirect(back,303)
+  }
 
   const db=supabaseAdmin()
   const {data:taxpayer}=await db.from('taxpayers').select('nino').eq('id',taxpayerId).maybeSingle()
