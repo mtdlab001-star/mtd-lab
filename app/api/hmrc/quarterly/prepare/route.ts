@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { signReviewPayload } from '@/lib/review-token'
 
 function money(value: FormDataEntryValue | null) {
   const n=Number(value||0)
@@ -20,8 +21,9 @@ export async function POST(req: Request) {
     travelCosts:money(form.get('travelCosts')),
     premisesCosts:money(form.get('premisesCosts')),
     professionalFees:money(form.get('professionalFees')),
-    otherExpenses:money(form.get('otherExpenses'))
+    otherExpenses:money(form.get('otherExpenses')),
+    preparedAt:new Date().toISOString()
   }
-  const token=Buffer.from(JSON.stringify(payload),'utf8').toString('base64url')
+  const token=signReviewPayload(payload)
   return NextResponse.redirect(new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/quarterly/review?data=${encodeURIComponent(token)}`,req.url),303)
 }
