@@ -27,6 +27,7 @@ export default async function TaxpayerSidebar({taxpayerId,active}:Props){
    {item('submissions','Submission Centre',`/taxpayers/${id}/submissions`,true)}
    {item('quarterly','Quarterly Updates',`/taxpayers/${id}/quarterly`,true)}
    {item('calculations','HMRC Tax Calculation',`/taxpayers/${id}/calculations`,true)}
+   {item('end-of-year','End of Year',`/taxpayers/${id}/end-of-year`,true)}
    {item('history','Submission History',`/taxpayers/${id}/quarterly/history`,true)}
   </div>
   <div className="operator">Operated by Glomaxel IT Service</div>
