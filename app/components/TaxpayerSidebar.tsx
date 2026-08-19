@@ -33,6 +33,7 @@ export default async function TaxpayerSidebar({taxpayerId,active}:Props){
    {item('reliefs','Reliefs & Deductions',`/taxpayers/${id}/end-of-year/reliefs`,true)}
    {item('other-income','Other SA Income',`/taxpayers/${id}/end-of-year/other-income`,true)}
    {item('state-benefits','State Benefits',`/taxpayers/${id}/end-of-year/state-benefits`,true)}
+   {item('employment','Employment Income',`/taxpayers/${id}/end-of-year/employment`,true)}
    {item('history','Submission History',`/taxpayers/${id}/quarterly/history`,true)}
   </div>
   <div className="operator">Operated by Glomaxel IT Service</div>
