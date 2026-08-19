@@ -1,0 +1,19 @@
+import { NextResponse } from 'next/server'
+import { hmrcWebBase } from '@/lib/hmrc'
+import { signState } from '@/lib/oauth-state'
+
+export async function GET(req: Request) {
+  const url = new URL(req.url)
+  const taxpayerId = url.searchParams.get('taxpayerId') || 'demo'
+  const clientId = process.env.HMRC_CLIENT_ID?.trim()
+  const redirectUri = process.env.HMRC_REDIRECT_URI?.trim()
+  if (!clientId || !redirectUri) return NextResponse.json({ error: 'HMRC OAuth configuration missing' }, { status: 503 })
+  const state = signState(taxpayerId)
+  const auth = new URL(`${hmrcWebBase}/oauth/authorize`)
+  auth.searchParams.set('response_type', 'code')
+  auth.searchParams.set('client_id', clientId)
+  auth.searchParams.set('scope', 'read:self-assessment write:self-assessment')
+  auth.searchParams.set('state', state)
+  auth.searchParams.set('redirect_uri', redirectUri)
+  return NextResponse.redirect(auth)
+}
