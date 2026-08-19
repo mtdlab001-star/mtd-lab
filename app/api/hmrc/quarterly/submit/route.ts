@@ -6,6 +6,14 @@ import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
 import { buildSelfEmploymentCumulativePayload, buildUkPropertyCumulativePayload, cumulativeEndpoint, ukPropertyCumulativeEndpoint, taxYearFromDate } from '@/lib/hmrc-quarterly'
 
+function rejectionDetails(payload:any){
+  const rows:any[]=[]
+  if(Array.isArray(payload?.errors)) for(const e of payload.errors) rows.push({code:e?.code||'HMRC_ERROR',message:e?.message||'HMRC rejected this value',path:e?.path||e?.paths||''})
+  if(!rows.length&&payload?.code) rows.push({code:payload.code,message:payload?.message||'HMRC rejected the submission',path:payload?.path||''})
+  if(!rows.length&&payload?.message) rows.push({code:'HMRC_ERROR',message:payload.message,path:''})
+  return rows
+}
+
 export async function POST(req:Request){
   const form=await req.formData()
   const token=String(form.get('reviewToken')||'')
@@ -14,7 +22,9 @@ export async function POST(req:Request){
   const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/quarterly/review`,req.url)
   back.searchParams.set('data',token)
   if(!p){back.searchParams.set('error','Review token is invalid or has been altered');return NextResponse.redirect(back,303)}
-  if(!p.periodStart||p.periodStart<'2025-04-06'){back.searchParams.set('error','Cumulative quarterly submission requires tax year 2025/26 or later');return NextResponse.redirect(back,303)}
+  if(!p.businessId){back.searchParams.set('error','Select a valid HMRC business before submission');return NextResponse.redirect(back,303)}
+  if(!p.periodStart||!p.periodEnd||p.periodStart>'9999-12-31'||p.periodEnd<p.periodStart){back.searchParams.set('error','The cumulative submission period is invalid');return NextResponse.redirect(back,303)}
+  if(p.periodStart<'2025-04-06'){back.searchParams.set('error','Cumulative quarterly submission requires tax year 2025/26 or later');return NextResponse.redirect(back,303)}
   if(process.env.HMRC_ENVIRONMENT==='production'&&process.env.HMRC_ALLOW_PRODUCTION_SUBMISSIONS!=='true'){
     back.searchParams.set('error','Production HMRC submissions are locked. Complete sandbox testing and explicitly enable production submissions first.')
     return NextResponse.redirect(back,303)
@@ -69,11 +79,17 @@ export async function POST(req:Request){
     let responsePayload:any={}
     try{responsePayload=text?JSON.parse(text):{}}catch{responsePayload={raw:text}}
     const correlationId=res.headers.get('x-correlationid')||res.headers.get('x-correlation-id')
+    const rejections=rejectionDetails(responsePayload)
     await db.from('hmrc_quarterly_submissions').update({
       status:res.ok?'submitted':'failed',response_payload:responsePayload,hmrc_correlation_id:correlationId,hmrc_http_status:res.status,
-      error_message:res.ok?null:(responsePayload?.message||text||`HMRC ${res.status}`),submitted_at:res.ok?new Date().toISOString():null,updated_at:new Date().toISOString()
+      error_message:res.ok?null:(rejections[0]?.message||text||`HMRC ${res.status}`),submitted_at:res.ok?new Date().toISOString():null,updated_at:new Date().toISOString()
     }).eq('id',auditId)
-    if(!res.ok)throw new Error(responsePayload?.message||responsePayload?.code||`HMRC ${res.status}`)
+    if(!res.ok){
+      if(rejections.length) back.searchParams.set('hmrcErrors',Buffer.from(JSON.stringify(rejections),'utf8').toString('base64url'))
+      back.searchParams.set('error',rejections[0]?.message||responsePayload?.message||responsePayload?.code||`HMRC ${res.status}`)
+      if(correlationId) back.searchParams.set('correlationId',correlationId)
+      return NextResponse.redirect(back,303)
+    }
     back.searchParams.set('submitted','1')
     if(correlationId)back.searchParams.set('correlationId',correlationId)
     return NextResponse.redirect(back,303)
