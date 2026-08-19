@@ -1,0 +1,24 @@
+import { NextResponse } from 'next/server'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { hmrcApiBase } from '@/lib/hmrc'
+import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
+import { buildFraudHeaders } from '@/lib/hmrc-fraud'
+
+function amount(form:FormData,key:string){const raw=String(form.get(key)||'').trim();if(!raw)return undefined;const n=Number(raw);return Number.isFinite(n)?n:undefined}
+function clean(obj:any):any{if(Array.isArray(obj))return obj.map(clean);if(obj&&typeof obj==='object')return Object.fromEntries(Object.entries(obj).filter(([,v])=>v!==undefined).map(([k,v])=>[k,clean(v)]));return obj}
+
+export async function POST(req:Request){
+ const form=await req.formData();const taxpayerId=String(form.get('taxpayerId')||'demo');const taxYear=String(form.get('taxYear')||'');const calculationId=String(form.get('calculationId')||'').trim();const type=String(form.get('typeOfBusiness')||'self-employment')
+ const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/end-of-year/adjustments`,req.url);back.searchParams.set('taxYear',taxYear)
+ if(!/^20\d{2}-\d{2}$/.test(taxYear)||!calculationId){back.searchParams.set('error','A valid tax year and BSAS calculation ID are required');return NextResponse.redirect(back,303)}
+ if(!['self-employment','uk-property'].includes(type)){back.searchParams.set('error','Unsupported business type');return NextResponse.redirect(back,303)}
+ const {data:taxpayer}=await supabaseAdmin().from('taxpayers').select('nino').eq('id',taxpayerId).maybeSingle();if(!taxpayer?.nino){back.searchParams.set('error','Taxpayer NINO is missing');return NextResponse.redirect(back,303)}
+ let token:string;try{token=await getValidHmrcAccessToken(taxpayerId)}catch(e:any){back.searchParams.set('error',e.message||'HMRC connection is incomplete');return NextResponse.redirect(back,303)}
+ const fraud=buildFraudHeaders(req,form,taxpayerId);if(fraud.missing.length){back.searchParams.set('error',`Missing HMRC fraud prevention data: ${fraud.missing.join(', ')}`);return NextResponse.redirect(back,303)}
+ let payload:any
+ if(type==='self-employment')payload=clean({income:{turnover:amount(form,'turnover'),other:amount(form,'otherIncome')},expenses:{consolidatedExpenses:amount(form,'consolidatedExpenses')}})
+ else payload=clean({ukProperty:{income:{totalRentsReceived:amount(form,'totalRentsReceived'),premiumsOfLeaseGrant:amount(form,'premiumsOfLeaseGrant'),reversePremiums:amount(form,'reversePremiums'),otherPropertyIncome:amount(form,'otherPropertyIncome')},expenses:{premisesRunningCosts:amount(form,'premisesRunningCosts'),repairsAndMaintenance:amount(form,'repairsAndMaintenance'),financialCosts:amount(form,'financialCosts'),professionalFees:amount(form,'professionalFees'),costOfServices:amount(form,'costOfServices'),residentialFinancialCost:amount(form,'residentialFinancialCost'),other:amount(form,'otherPropertyExpenses'),travelCosts:amount(form,'travelCosts')}}})
+ const empty=JSON.stringify(payload).replace(/[{}]/g,'').trim()==='';if(empty){back.searchParams.set('error','Enter at least one accounting adjustment');return NextResponse.redirect(back,303)}
+ const segment=type==='self-employment'?'self-employment':'uk-property';const endpoint=`/individuals/self-assessment/adjustable-summary/${encodeURIComponent(taxpayer.nino)}/${segment}/${encodeURIComponent(calculationId)}/adjust/${encodeURIComponent(taxYear)}`
+ try{const res=await fetch(`${hmrcApiBase}${endpoint}`,{method:'POST',headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.hmrc.7.0+json','Content-Type':'application/json',...(process.env.HMRC_ENVIRONMENT==='production'?{}:{'Gov-Test-Scenario':'DEFAULT'}),...fraud.headers},body:JSON.stringify(payload),cache:'no-store'});const text=await res.text();let data:any={};try{data=text?JSON.parse(text):{}}catch{data={raw:text}}const correlationId=res.headers.get('x-correlationid')||res.headers.get('x-correlation-id')||'';if(!res.ok){back.searchParams.set('error',data?.message||data?.code||`HMRC ${res.status}`);if(correlationId)back.searchParams.set('correlationId',correlationId);return NextResponse.redirect(back,303)}back.searchParams.set('adjustmentSubmitted','1');back.searchParams.set('calculationId',calculationId);if(correlationId)back.searchParams.set('correlationId',correlationId);return NextResponse.redirect(back,303)}catch(e:any){back.searchParams.set('error',e.message||'Could not submit HMRC accounting adjustments');return NextResponse.redirect(back,303)}
+}
