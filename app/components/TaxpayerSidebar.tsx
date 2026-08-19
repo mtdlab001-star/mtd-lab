@@ -26,6 +26,7 @@ export default async function TaxpayerSidebar({taxpayerId,active}:Props){
    <div className="navGroupLabel">MTD Filing</div>
    {item('submissions','Submission Centre',`/taxpayers/${id}/submissions`,true)}
    {item('quarterly','Quarterly Updates',`/taxpayers/${id}/quarterly`,true)}
+   {item('calculations','HMRC Tax Calculation',`/taxpayers/${id}/calculations`,true)}
    {item('history','Submission History',`/taxpayers/${id}/quarterly/history`,true)}
   </div>
   <div className="operator">Operated by Glomaxel IT Service</div>
