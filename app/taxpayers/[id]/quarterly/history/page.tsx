@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 
@@ -5,10 +6,21 @@ export const dynamic='force-dynamic'
 
 function fmt(value?:string|null){if(!value)return 'Not available';return new Date(value).toLocaleString('en-GB')}
 function fmtDate(value?:string|null){if(!value)return 'Not available';const d=new Date(`${value}T00:00:00`);return Number.isNaN(d.getTime())?value:d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
+function sourceType(r:any){const raw=JSON.stringify(r.payload||r.request_payload||r.raw||{}).toLowerCase();return raw.includes('ukproperty')||raw.includes('uk_property')||raw.includes('property')?'UK Property':'Self Employment'}
+function money(v:any){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('en-GB',{style:'currency',currency:'GBP'}):'Not available'}
+function totals(r:any){const p=r.payload||r.request_payload||r.raw||{};if(p.ukProperty){const i=p.ukProperty.income||{},e=p.ukProperty.expenses||{};return {income:Object.values(i).reduce((a:any,v:any)=>a+(typeof v==='number'?v:0),0),expenses:Object.values(e).reduce((a:any,v:any)=>a+(typeof v==='number'?v:0),0)}}const i=p.periodIncome||{},e=p.periodExpenses||{};return {income:Object.values(i).reduce((a:any,v:any)=>a+(typeof v==='number'?v:0),0),expenses:Object.values(e).reduce((a:any,v:any)=>a+(typeof v==='number'?v:0),0)}}
 
 export default async function HistoryPage({params}:{params:Promise<{id:string}>}){
  const {id}=await params
  let rows:any[]=[];let unavailable=false
  try{const {data,error}=await supabaseAdmin().from('hmrc_quarterly_submissions').select('*').eq('taxpayer_id',id).order('created_at',{ascending:false});if(error)throw error;rows=data||[]}catch{unavailable=true}
- return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="history"/><main className="main"><div className="top"><div><h1 className="pageTitle">Quarterly submission history</h1><p className="muted">Audit trail of cumulative HMRC quarterly submission attempts.</p></div></div>{unavailable&&<div className="status statusError">Submission history is waiting for the Supabase quarterly audit migration to be applied.</div>}<section className="panel"><div className="tableWrap"><table><thead><tr><th>Created</th><th>Business</th><th>Tax year</th><th>Period end</th><th>Status</th><th>HMRC status</th><th>Correlation ID</th></tr></thead><tbody>{rows.length?rows.map(r=><tr key={r.id}><td>{fmt(r.created_at)}</td><td className="mono">{r.business_id}</td><td>{r.tax_year||''}</td><td>{fmtDate(r.period_end)}</td><td><span className={`statusPill ${r.status==='submitted'?'statusDone':'statusOpen'}`}>{r.status}</span></td><td>{r.hmrc_http_status||''}</td><td className="mono">{r.hmrc_correlation_id||''}</td></tr>):<tr><td colSpan={7} className="empty">No quarterly submissions recorded yet.</td></tr>}</tbody></table></div></section></main></div>
+ const submitted=rows.filter(r=>r.status==='submitted').length
+ const failed=rows.filter(r=>r.status!=='submitted').length
+ return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="history"/><main className="main">
+  <div className="top"><div><h1 className="pageTitle">Submission history</h1><p className="muted">Permanent audit trail of cumulative quarterly update attempts for this taxpayer.</p></div><Link className="btn" href={`/taxpayers/${encodeURIComponent(id)}/submissions`}>New quarterly update</Link></div>
+  <div className="grid3"><section className="panel"><div className="muted">Submission attempts</div><div className="metric">{rows.length}</div></section><section className="panel"><div className="muted">Accepted</div><div className="metric">{submitted}</div></section><section className="panel"><div className="muted">Needs attention</div><div className="metric">{failed}</div></section></div>
+  <div className="status">HMRC quarterly updates are cumulative. Each update should cover the start of the tax year through the selected period end, so later updates can incorporate corrected digital records.</div>
+  {unavailable&&<div className="status statusError">Submission history is waiting for the Supabase quarterly audit migration to be applied.</div>}
+  <section className="panel"><div className="tableWrap"><table><thead><tr><th>Submitted</th><th>Income source</th><th>Business ID</th><th>Tax year</th><th>Cumulative period end</th><th>Income</th><th>Expenses</th><th>Result</th><th>HMRC status</th><th>Correlation ID</th></tr></thead><tbody>{rows.length?rows.map(r=>{const t=totals(r);return <tr key={r.id}><td>{fmt(r.created_at)}</td><td>{sourceType(r)}</td><td className="mono">{r.business_id}</td><td>{r.tax_year||''}</td><td>{fmtDate(r.period_end)}</td><td>{money(t.income)}</td><td>{money(t.expenses)}</td><td><span className={`statusPill ${r.status==='submitted'?'statusDone':'statusOpen'}`}>{r.status==='submitted'?'Accepted':'Needs attention'}</span></td><td>{r.hmrc_http_status||''}</td><td className="mono">{r.hmrc_correlation_id||''}</td></tr>}):<tr><td colSpan={10} className="empty">No quarterly submissions recorded yet. Submit an update from the Submission Centre and it will appear here.</td></tr>}</tbody></table></div></section>
+ </main></div>
 }
