@@ -21,8 +21,8 @@ export async function POST(req:Request){
   }
 
   const db=supabaseAdmin()
-  const {data:taxpayer}=await db.from('taxpayers').select('nino').eq('id',taxpayerId).maybeSingle()
-  if(!taxpayer?.nino){back.searchParams.set('error','HMRC taxpayer record is missing a NINO');return NextResponse.redirect(back,303)}
+  const {data:taxpayer,error:taxpayerError}=await db.from('taxpayers').select('nino').eq('id',taxpayerId).maybeSingle()
+  if(taxpayerError||!taxpayer?.nino){back.searchParams.set('error','HMRC taxpayer record is missing a NINO');return NextResponse.redirect(back,303)}
 
   let accessToken:string
   try{accessToken=await getValidHmrcAccessToken(taxpayerId)}catch(e:any){back.searchParams.set('error',e.message||'HMRC connection is incomplete');return NextResponse.redirect(back,303)}
@@ -33,19 +33,56 @@ export async function POST(req:Request){
   const taxYear=taxYearFromDate(p.periodStart)
   const requestPayload=buildSelfEmploymentCumulativePayload(p)
   const endpoint=cumulativeEndpoint(taxpayer.nino,p.businessId,taxYear)
-  let auditId:string|undefined
-  try{
-    const {data:audit}=await db.from('hmrc_quarterly_submissions').insert({taxpayer_id:taxpayerId,business_id:p.businessId,period_start:p.periodStart,period_end:p.periodEnd,tax_year:taxYear,status:'sending',request_payload:requestPayload}).select('id').maybeSingle()
-    auditId=audit?.id
-  }catch{}
 
-  try{
-    const res=await fetch(`${hmrcApiBase}${endpoint}`,{method:'PUT',headers:{Authorization:`Bearer ${accessToken}`,Accept:'application/vnd.hmrc.5.0+json','Content-Type':'application/json',...(process.env.HMRC_ENVIRONMENT==='production'?{}:{'Gov-Test-Scenario':process.env.HMRC_TEST_SCENARIO||'DEFAULT'}),...fraud.headers},body:JSON.stringify(requestPayload),cache:'no-store'})
-    const text=await res.text();let responsePayload:any={};try{responsePayload=text?JSON.parse(text):{}}catch{responsePayload={raw:text}}
-    const correlationId=res.headers.get('x-correlationid')||res.headers.get('x-correlation-id')
-    if(auditId)await db.from('hmrc_quarterly_submissions').update({status:res.ok?'submitted':'failed',response_payload:responsePayload,hmrc_correlation_id:correlationId,hmrc_http_status:res.status,error_message:res.ok?null:(responsePayload?.message||text||`HMRC ${res.status}`),submitted_at:res.ok?new Date().toISOString():null,updated_at:new Date().toISOString()}).eq('id',auditId)
-    if(!res.ok)throw new Error(responsePayload?.message||responsePayload?.code||`HMRC ${res.status}`)
-    back.searchParams.set('submitted','1');if(correlationId)back.searchParams.set('correlationId',correlationId)
+  const {data:audit,error:auditError}=await db.from('hmrc_quarterly_submissions').insert({
+    taxpayer_id:taxpayerId,
+    business_id:p.businessId,
+    period_start:p.periodStart,
+    period_end:p.periodEnd,
+    tax_year:taxYear,
+    status:'sending',
+    request_payload:requestPayload
+  }).select('id').maybeSingle()
+
+  if(auditError||!audit?.id){
+    back.searchParams.set('error','Submission audit storage is not ready. Apply the Supabase quarterly submissions migration before sending anything to HMRC.')
     return NextResponse.redirect(back,303)
-  }catch(e:any){back.searchParams.set('error',e.message||'HMRC submission failed');return NextResponse.redirect(back,303)}
+  }
+
+  const auditId=audit.id
+  try{
+    const res=await fetch(`${hmrcApiBase}${endpoint}`,{
+      method:'PUT',
+      headers:{
+        Authorization:`Bearer ${accessToken}`,
+        Accept:'application/vnd.hmrc.5.0+json',
+        'Content-Type':'application/json',
+        ...(process.env.HMRC_ENVIRONMENT==='production'?{}:{'Gov-Test-Scenario':process.env.HMRC_TEST_SCENARIO||'DEFAULT'}),
+        ...fraud.headers
+      },
+      body:JSON.stringify(requestPayload),
+      cache:'no-store'
+    })
+    const text=await res.text()
+    let responsePayload:any={}
+    try{responsePayload=text?JSON.parse(text):{}}catch{responsePayload={raw:text}}
+    const correlationId=res.headers.get('x-correlationid')||res.headers.get('x-correlation-id')
+    await db.from('hmrc_quarterly_submissions').update({
+      status:res.ok?'submitted':'failed',
+      response_payload:responsePayload,
+      hmrc_correlation_id:correlationId,
+      hmrc_http_status:res.status,
+      error_message:res.ok?null:(responsePayload?.message||text||`HMRC ${res.status}`),
+      submitted_at:res.ok?new Date().toISOString():null,
+      updated_at:new Date().toISOString()
+    }).eq('id',auditId)
+    if(!res.ok)throw new Error(responsePayload?.message||responsePayload?.code||`HMRC ${res.status}`)
+    back.searchParams.set('submitted','1')
+    if(correlationId)back.searchParams.set('correlationId',correlationId)
+    return NextResponse.redirect(back,303)
+  }catch(e:any){
+    await db.from('hmrc_quarterly_submissions').update({status:'failed',error_message:e.message||'HMRC submission failed',updated_at:new Date().toISOString()}).eq('id',auditId)
+    back.searchParams.set('error',e.message||'HMRC submission failed')
+    return NextResponse.redirect(back,303)
+  }
 }
