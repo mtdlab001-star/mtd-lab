@@ -20,6 +20,10 @@ function flattenObligations(payload:any){
   return groups.flatMap((group:any)=>(group.obligationDetails||[]).map((o:any)=>({...o,businessId:group.identification||group.businessId||group.incomeSourceId||null})))
 }
 
+function hasModernObligation(rows:any[]){
+  return rows.some((o:any)=>String(firstValue(o,['periodStartDate','inboundCorrespondenceFrom','start','PeriodStartDate'])||'')>='2025-04-06')
+}
+
 export async function POST(req:Request){
   const form=await req.formData()
   const taxpayerId=String(form.get('taxpayerId')||'demo')
@@ -38,13 +42,26 @@ export async function POST(req:Request){
     if(list.length){const {error}=await db.from('hmrc_businesses').insert(list.map((b:any)=>({taxpayer_id:taxpayerId,business_id:b.incomeSourceId||b.businessId,business_type:b.incomeSourceType||b.type,business_name:b.businessName||b.tradingName||b.incomeSourceName||null,raw:b})));throwIfError(error,'Saving businesses failed')}
 
     const {fromDate,toDate}=currentUkTaxYearRange()
-    let obligations=await hmrcGet(`/obligations/details/${encodeURIComponent(nino)}/income-and-expenditure?fromDate=${fromDate}&toDate=${toDate}`,accessToken,'application/vnd.hmrc.3.0+json')
-    let all=flattenObligations(obligations)
+    const currentPath=`/obligations/details/${encodeURIComponent(nino)}/income-and-expenditure?fromDate=${fromDate}&toDate=${toDate}`
+    let obligations:any=null
+    let all:any[]=[]
 
-    // Some HMRC sandbox users still return only legacy static obligations for the current-year query.
-    // Preserve test visibility by falling back to the unfiltered sandbox response when nothing is returned.
-    if(!all.length&&process.env.HMRC_ENVIRONMENT!=='production'){
-      obligations=await hmrcGet(`/obligations/details/${encodeURIComponent(nino)}/income-and-expenditure`,accessToken,'application/vnd.hmrc.3.0+json')
+    if(process.env.HMRC_ENVIRONMENT!=='production'){
+      try{
+        obligations=await hmrcGet(currentPath,accessToken,'application/vnd.hmrc.3.0+json','DYNAMIC')
+        all=flattenObligations(obligations)
+      }catch{}
+    }
+
+    if(!hasModernObligation(all)){
+      try{
+        obligations=await hmrcGet(currentPath,accessToken,'application/vnd.hmrc.3.0+json','DEFAULT')
+        all=flattenObligations(obligations)
+      }catch{}
+    }
+
+    if(!hasModernObligation(all)&&process.env.HMRC_ENVIRONMENT!=='production'){
+      obligations=await hmrcGet(`/obligations/details/${encodeURIComponent(nino)}/income-and-expenditure`,accessToken,'application/vnd.hmrc.3.0+json','DEFAULT')
       all=flattenObligations(obligations)
     }
 
