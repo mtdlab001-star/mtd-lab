@@ -6,6 +6,20 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 function firstValue(obj:any,keys:string[]){for(const key of keys){const value=obj?.[key];if(value!==undefined&&value!==null&&value!=='')return value}return null}
 function throwIfError(error:any,context:string){if(error)throw new Error(`${context}: ${error.message||JSON.stringify(error)}`)}
 
+function currentUkTaxYearRange(){
+  const now=new Date()
+  const year=now.getUTCFullYear()
+  const month=now.getUTCMonth()+1
+  const day=now.getUTCDate()
+  const startYear=month>4||(month===4&&day>=6)?year:year-1
+  return {fromDate:`${startYear}-04-06`,toDate:`${startYear+1}-04-05`}
+}
+
+function flattenObligations(payload:any){
+  const groups=Array.isArray(payload?.obligations)?payload.obligations:[]
+  return groups.flatMap((group:any)=>(group.obligationDetails||[]).map((o:any)=>({...o,businessId:group.identification||group.businessId||group.incomeSourceId||null})))
+}
+
 export async function POST(req:Request){
   const form=await req.formData()
   const taxpayerId=String(form.get('taxpayerId')||'demo')
@@ -23,9 +37,17 @@ export async function POST(req:Request){
     throwIfError(deleteBusinessesError,'Deleting existing businesses failed')
     if(list.length){const {error}=await db.from('hmrc_businesses').insert(list.map((b:any)=>({taxpayer_id:taxpayerId,business_id:b.incomeSourceId||b.businessId,business_type:b.incomeSourceType||b.type,business_name:b.businessName||b.tradingName||b.incomeSourceName||null,raw:b})));throwIfError(error,'Saving businesses failed')}
 
-    const obligations=await hmrcGet(`/obligations/details/${encodeURIComponent(nino)}/income-and-expenditure`,accessToken,'application/vnd.hmrc.3.0+json')
-    const groups=Array.isArray(obligations?.obligations)?obligations.obligations:[]
-    const all=groups.flatMap((group:any)=>(group.obligationDetails||[]).map((o:any)=>({...o,businessId:group.identification||group.businessId||group.incomeSourceId||null})))
+    const {fromDate,toDate}=currentUkTaxYearRange()
+    let obligations=await hmrcGet(`/obligations/details/${encodeURIComponent(nino)}/income-and-expenditure?fromDate=${fromDate}&toDate=${toDate}`,accessToken,'application/vnd.hmrc.3.0+json')
+    let all=flattenObligations(obligations)
+
+    // Some HMRC sandbox users still return only legacy static obligations for the current-year query.
+    // Preserve test visibility by falling back to the unfiltered sandbox response when nothing is returned.
+    if(!all.length&&process.env.HMRC_ENVIRONMENT!=='production'){
+      obligations=await hmrcGet(`/obligations/details/${encodeURIComponent(nino)}/income-and-expenditure`,accessToken,'application/vnd.hmrc.3.0+json')
+      all=flattenObligations(obligations)
+    }
+
     const {error:deleteObligationsError}=await db.from('hmrc_obligations').delete().eq('taxpayer_id',taxpayerId)
     throwIfError(deleteObligationsError,'Deleting existing obligations failed')
     if(all.length){const rows=all.map((o:any)=>({taxpayer_id:taxpayerId,business_id:o.businessId,period_start:firstValue(o,['periodStartDate','inboundCorrespondenceFrom','start','PeriodStartDate']),period_end:firstValue(o,['periodEndDate','inboundCorrespondenceTo','end','PeriodEndDate']),due_date:firstValue(o,['dueDate','inboundCorrespondenceDueDate','due','DueDate']),status:firstValue(o,['status','Status']),received_date:firstValue(o,['receivedDate','inboundCorrespondenceDateReceived','inboundCorrespondenceReceivedDate','received','ReceivedDate']),raw:o}));const {error}=await db.from('hmrc_obligations').insert(rows);throwIfError(error,'Saving obligations failed')}
