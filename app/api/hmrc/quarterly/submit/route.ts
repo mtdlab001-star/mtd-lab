@@ -4,7 +4,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
-import { buildSelfEmploymentCumulativePayload, cumulativeEndpoint, taxYearFromDate } from '@/lib/hmrc-quarterly'
+import { buildSelfEmploymentCumulativePayload, buildUkPropertyCumulativePayload, cumulativeEndpoint, ukPropertyCumulativeEndpoint, taxYearFromDate } from '@/lib/hmrc-quarterly'
 
 export async function POST(req:Request){
   const form=await req.formData()
@@ -31,8 +31,10 @@ export async function POST(req:Request){
   if(fraud.missing.length){back.searchParams.set('readiness','blocked');back.searchParams.set('missing',fraud.missing.join(','));return NextResponse.redirect(back,303)}
 
   const taxYear=taxYearFromDate(p.periodStart)
-  const requestPayload=buildSelfEmploymentCumulativePayload(p)
-  const endpoint=cumulativeEndpoint(taxpayer.nino,p.businessId,taxYear)
+  const property=p.filingType==='property'
+  const requestPayload=property?buildUkPropertyCumulativePayload(p):buildSelfEmploymentCumulativePayload(p)
+  const endpoint=property?ukPropertyCumulativeEndpoint(taxpayer.nino,p.businessId,taxYear):cumulativeEndpoint(taxpayer.nino,p.businessId,taxYear)
+  const acceptVersion=property?'6.0':'5.0'
 
   const {data:audit,error:auditError}=await db.from('hmrc_quarterly_submissions').insert({
     taxpayer_id:taxpayerId,
@@ -41,7 +43,7 @@ export async function POST(req:Request){
     period_end:p.periodEnd,
     tax_year:taxYear,
     status:'sending',
-    request_payload:requestPayload
+    request_payload:{filingType:p.filingType||'self-employment',payload:requestPayload}
   }).select('id').maybeSingle()
 
   if(auditError||!audit?.id){
@@ -55,7 +57,7 @@ export async function POST(req:Request){
       method:'PUT',
       headers:{
         Authorization:`Bearer ${accessToken}`,
-        Accept:'application/vnd.hmrc.5.0+json',
+        Accept:`application/vnd.hmrc.${acceptVersion}+json`,
         'Content-Type':'application/json',
         ...(process.env.HMRC_ENVIRONMENT==='production'?{}:{'Gov-Test-Scenario':process.env.HMRC_TEST_SCENARIO||'DEFAULT'}),
         ...fraud.headers
@@ -68,13 +70,8 @@ export async function POST(req:Request){
     try{responsePayload=text?JSON.parse(text):{}}catch{responsePayload={raw:text}}
     const correlationId=res.headers.get('x-correlationid')||res.headers.get('x-correlation-id')
     await db.from('hmrc_quarterly_submissions').update({
-      status:res.ok?'submitted':'failed',
-      response_payload:responsePayload,
-      hmrc_correlation_id:correlationId,
-      hmrc_http_status:res.status,
-      error_message:res.ok?null:(responsePayload?.message||text||`HMRC ${res.status}`),
-      submitted_at:res.ok?new Date().toISOString():null,
-      updated_at:new Date().toISOString()
+      status:res.ok?'submitted':'failed',response_payload:responsePayload,hmrc_correlation_id:correlationId,hmrc_http_status:res.status,
+      error_message:res.ok?null:(responsePayload?.message||text||`HMRC ${res.status}`),submitted_at:res.ok?new Date().toISOString():null,updated_at:new Date().toISOString()
     }).eq('id',auditId)
     if(!res.ok)throw new Error(responsePayload?.message||responsePayload?.code||`HMRC ${res.status}`)
     back.searchParams.set('submitted','1')
