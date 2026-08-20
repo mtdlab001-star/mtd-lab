@@ -8,9 +8,10 @@ async function hmac(value:string){
   return Array.from(new Uint8Array(sig)).map(b=>b.toString(16).padStart(2,'0')).join('')
 }
 
-export async function createAppSession(username:string){
+export async function createAppSession(username:string,maxAgeSeconds=60*60*12){
   if(!secret()) throw new Error('MTD_SESSION_SECRET is not configured')
-  const expires=Date.now()+1000*60*60*12
+  const safeMaxAge=Math.max(60*15,Math.min(maxAgeSeconds,60*60*24*30))
+  const expires=Date.now()+1000*safeMaxAge
   const payload=`${username}|${expires}`
   return `${payload}|${await hmac(payload)}`
 }
