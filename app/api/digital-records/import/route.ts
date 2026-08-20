@@ -15,8 +15,8 @@ export async function POST(req:Request){
   if(!allowed.has(businessId)||!/^\d{4}-\d{2}-\d{2}$/.test(transactionDate)||!['income','expense'].includes(recordType)||!category||!Number.isFinite(amount)||amount<0){skipped++;continue}
   const {data:dupe}=await db.from('mtd_digital_records').select('id').eq('taxpayer_id',taxpayerId).eq('business_id',businessId).eq('transaction_date',transactionDate).eq('record_type',recordType).eq('category',category).eq('amount',amount).limit(1)
   if(dupe?.length){skipped++;continue}
-  inserts.push({taxpayer_id:taxpayerId,business_id:businessId,tax_year:taxYear(transactionDate),transaction_date:transactionDate,record_type:recordType,category,description:description||null,amount,source:'csv',supporting_document_ref:documentRef||null})
+  inserts.push({taxpayer_id:taxpayerId,business_id:businessId,tax_year:taxYear(transactionDate),transaction_date:transactionDate,record_type:recordType,category,description:description||null,amount,source:'csv',document_url:documentRef||null})
  }
- if(inserts.length){let {error}=await db.from('mtd_digital_records').insert(inserts);if(error&&error.message.toLowerCase().includes('supporting_document_ref')){const fallback=inserts.map(({supporting_document_ref,...x})=>x);error=(await db.from('mtd_digital_records').insert(fallback)).error}if(error){back.searchParams.set('error',error.message);return NextResponse.redirect(back,303)}imported=inserts.length}
+ if(inserts.length){const {error}=await db.from('mtd_digital_records').insert(inserts);if(error){back.searchParams.set('error',error.message);return NextResponse.redirect(back,303)}imported=inserts.length}
  back.searchParams.set('imported',String(imported));back.searchParams.set('skipped',String(skipped));return NextResponse.redirect(back,303)
 }
