@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
+import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 
 export async function GET(req:Request){
  const url=new URL(req.url);const taxpayerId=String(url.searchParams.get('taxpayerId')||'demo');const taxYear=String(url.searchParams.get('taxYear')||'');const calculationId=String(url.searchParams.get('calculationId')||'')
@@ -11,7 +12,7 @@ export async function GET(req:Request){
  let token:string;try{token=await getValidHmrcAccessToken(taxpayerId)}catch(e:any){back.searchParams.set('error',e.message||'HMRC connection is incomplete');return NextResponse.redirect(back,303)}
  const endpoint=`/individuals/calculations/${encodeURIComponent(taxpayer.nino)}/self-assessment/${encodeURIComponent(taxYear)}/${encodeURIComponent(calculationId)}`
  try{
-  const res=await fetch(`${hmrcApiBase}${endpoint}`,{headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.hmrc.8.0+json',...(process.env.HMRC_ENVIRONMENT==='production'?{}:{'Gov-Test-Scenario':'DYNAMIC'})},cache:'no-store'})
+  const res=await fetch(`${hmrcApiBase}${endpoint}`,{headers:{Authorization:`Bearer ${token}`,Accept:hmrcAcceptHeader('individualCalculations'),...(process.env.HMRC_ENVIRONMENT==='production'?{}:{'Gov-Test-Scenario':'DYNAMIC'})},cache:'no-store'})
   const text=await res.text();let payload:any={};try{payload=text?JSON.parse(text):{}}catch{payload={raw:text}}
   const correlationId=res.headers.get('x-correlationid')||res.headers.get('x-correlation-id')||''
   const {error:auditError}=await db.from('mtd_submission_audit').insert({taxpayer_id:taxpayerId,tax_year:taxYear,event_type:'tax_calculation_retrieval',status:res.ok?'accepted':'rejected',calculation_id:calculationId,hmrc_correlation_id:correlationId||null,hmrc_status:res.status,response_summary:payload,created_at:new Date().toISOString()});if(auditError)console.error('Calculation retrieval audit failed',auditError.message)
