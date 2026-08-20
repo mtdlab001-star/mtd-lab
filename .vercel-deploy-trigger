@@ -1,1 +1,1 @@
-Trigger Vercel production build from current main after Git connection was restored.
+Trigger Vercel Stage 2 preview build after agent authorisation, release readiness and request security hardening.
