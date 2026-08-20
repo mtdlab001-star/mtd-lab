@@ -1,0 +1,4 @@
+export default async function LoginPage({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){
+  const qs=await searchParams
+  return <main className="loginPage"><div className="loginWrap"><img className="loginLogo" src="/mtd-lab-logo.svg" alt="MTD Lab"/><section className="loginCard"><h1>Welcome Back</h1><p className="muted">Sign in to access MTD Lab.</p><form className="loginForm" method="post" action="/api/auth/login"><div><label htmlFor="username">Username</label><input id="username" name="username" className="field" autoComplete="username" required placeholder="Username"/></div><div><label htmlFor="password">Password</label><input id="password" name="password" className="field" type="password" autoComplete="current-password" required placeholder="Password"/></div><button className="btn" type="submit">Sign In</button></form>{qs.error&&<div className="loginError">{qs.error}</div>}</section></div></main>
+}
