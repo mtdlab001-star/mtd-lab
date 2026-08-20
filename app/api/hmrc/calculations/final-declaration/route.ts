@@ -5,11 +5,13 @@ import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
 import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 import { agentCan } from '@/lib/agent-authorisation'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 function taxYearEnded(taxYear:string){const start=Number(taxYear.slice(0,4));if(!Number.isFinite(start))return false;return new Date()>=new Date(Date.UTC(start+1,3,6,0,0,0))}
 function ty(date:string){const [y,m,d]=date.split('-').map(Number);const s=m>4||(m===4&&d>=6)?y:y-1;return `${s}-${String(s+1).slice(-2)}`}
 
 export async function POST(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const form=await req.formData();const taxpayerId=String(form.get('taxpayerId')||'demo');const taxYear=String(form.get('taxYear')||'');const calculationId=String(form.get('calculationId')||'');const confirmed=String(form.get('declarationConfirmed')||'')==='yes';const actingAgentId=String(form.get('actingAgentId')||'').trim()||null
  const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/calculations`,req.url);back.searchParams.set('taxYear',taxYear);back.searchParams.set('calculationId',calculationId)
  if(!taxYearEnded(taxYear)){back.searchParams.set('error','Final Declaration is not available until the selected tax year has ended.');return NextResponse.redirect(back,303)}
