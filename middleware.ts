@@ -11,6 +11,8 @@ export async function middleware(req:NextRequest){
   const login=req.nextUrl.clone()
   login.pathname='/login'
   login.search=''
+  const requested=`${req.nextUrl.pathname}${req.nextUrl.search}`
+  if(requested.startsWith('/')&&!requested.startsWith('//')) login.searchParams.set('next',requested)
   return NextResponse.redirect(login)
 }
 
