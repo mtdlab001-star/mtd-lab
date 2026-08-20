@@ -7,9 +7,9 @@ export function quarterlyPeriodLabel(value?: string | null) {
 export function quarterlyPeriodDates(taxYearStart: number, type: QuarterlyPeriodType) {
   if (type === 'calendar') return [
     { quarter: 1, start: `${taxYearStart}-04-01`, end: `${taxYearStart}-06-30`, due: `${taxYearStart}-08-07` },
-    { quarter: 2, start: `${taxYearStart}-07-01`, end: `${taxYearStart}-09-30`, due: `${taxYearStart}-11-07` },
-    { quarter: 3, start: `${taxYearStart}-10-01`, end: `${taxYearStart}-12-31`, due: `${taxYearStart + 1}-02-07` },
-    { quarter: 4, start: `${taxYearStart + 1}-01-01`, end: `${taxYearStart + 1}-03-31`, due: `${taxYearStart + 1}-05-07` }
+    { quarter: 2, start: `${taxYearStart}-04-01`, end: `${taxYearStart}-09-30`, due: `${taxYearStart}-11-07` },
+    { quarter: 3, start: `${taxYearStart}-04-01`, end: `${taxYearStart}-12-31`, due: `${taxYearStart + 1}-02-07` },
+    { quarter: 4, start: `${taxYearStart}-04-01`, end: `${taxYearStart + 1}-03-31`, due: `${taxYearStart + 1}-05-07` }
   ]
   return [
     { quarter: 1, start: `${taxYearStart}-04-06`, end: `${taxYearStart}-07-05`, due: `${taxYearStart}-08-07` },
