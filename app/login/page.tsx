@@ -16,6 +16,7 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<Rec
           <h1>Welcome to <span>MTD Lab</span></h1>
           <p className="muted">Sign in to access your MTD Income Tax dashboard.</p>
           <form className="loginForm" method="post" action="/api/auth/login">
+            <input type="hidden" name="next" value={qs.next||''}/>
             <div><label htmlFor="username">Username</label><div className="loginInputWrap"><span aria-hidden="true">♙</span><input id="username" name="username" className="field" autoComplete="username" required placeholder="Enter your username"/></div></div>
             <div><label htmlFor="password">Password</label><div className="loginInputWrap"><span aria-hidden="true">▣</span><input id="password" name="password" className="field" type="password" autoComplete="current-password" required placeholder="Enter your password"/></div></div>
             <div className="loginOptions"><label><input type="checkbox" name="remember"/> Remember me</label><span>Secure access</span></div>
