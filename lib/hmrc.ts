@@ -4,6 +4,20 @@ export const hmrcWebBase = isLive ? 'https://www.tax.service.gov.uk' : 'https://
 
 type HmrcToken = { access_token: string; refresh_token?: string; expires_in: number; token_type: string; scope?: string }
 
+export class HmrcRequestError extends Error {
+  status:number
+  payload:any
+  correlationId:string|null
+  constructor(status:number,payload:any,correlationId:string|null){
+    const detail=typeof payload==='string'?payload:(payload?.message||payload?.error_description||payload?.code||`HMRC request failed with status ${status}`)
+    super(detail)
+    this.name='HmrcRequestError'
+    this.status=status
+    this.payload=payload
+    this.correlationId=correlationId
+  }
+}
+
 async function tokenRequest(body: URLSearchParams) {
   const res = await fetch(`${hmrcApiBase}/oauth/token`, {
     method: 'POST',
@@ -11,8 +25,10 @@ async function tokenRequest(body: URLSearchParams) {
     body,
     cache: 'no-store'
   })
-  const data = await res.json()
-  if (!res.ok) throw new Error(data.error_description || data.error || 'HMRC token request failed')
+  const text=await res.text()
+  let data:any={}
+  try{data=text?JSON.parse(text):{}}catch{data={message:text}}
+  if (!res.ok) throw new HmrcRequestError(res.status,data,res.headers.get('x-correlationid')||res.headers.get('x-correlation-id'))
   return data as HmrcToken
 }
 
@@ -48,6 +64,6 @@ export async function hmrcGet(path: string, accessToken: string, accept: string,
   const text = await res.text()
   let data: any = null
   try { data = text ? JSON.parse(text) : null } catch { data = text }
-  if (!res.ok) throw new Error(`HMRC ${res.status}: ${typeof data === 'string' ? data : JSON.stringify(data)}`)
+  if (!res.ok) throw new HmrcRequestError(res.status,data,res.headers.get('x-correlationid')||res.headers.get('x-correlation-id'))
   return data
 }
