@@ -1,56 +1,25 @@
 import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
-export const dynamic = 'force-dynamic'
+export const dynamic='force-dynamic'
 
-function fmtDate(value?: string | null) {
-  if (!value) return 'Not synced'
-  const d = new Date(`${value}T00:00:00`)
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })
-}
+function fmtDate(value?:string|null){if(!value)return 'Not synced';const d=new Date(`${value}T00:00:00`);return Number.isNaN(d.getTime())?value:d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
+function taxYearNow(){const d=new Date();const y=d.getUTCFullYear();const m=d.getUTCMonth()+1;const day=d.getUTCDate();const start=m>4||(m===4&&day>=6)?y:y-1;return `${start}-${String(start+1).slice(-2)}`}
 
 export default async function Home(){
-  let taxpayerCount=0
-  let businessCount=0
-  let obligationCount=0
-  let openCount=0
-  let nextDue:string|null=null
-  let connected=false
-  try {
-    const db=supabaseAdmin()
-    const [{count:t},{count:b},{data:o},{data:c}] = await Promise.all([
-      db.from('taxpayers').select('*',{count:'exact',head:true}),
-      db.from('hmrc_businesses').select('*',{count:'exact',head:true}),
-      db.from('hmrc_obligations').select('due_date,status'),
-      db.from('hmrc_connections').select('id').limit(1)
-    ])
-    taxpayerCount=t||0
-    businessCount=b||0
-    obligationCount=o?.length||0
-    const open=(o||[]).filter((x:any)=>String(x.status).toLowerCase()==='open')
-    openCount=open.length
-    nextDue=open.map((x:any)=>x.due_date).filter(Boolean).sort()[0]||null
-    connected=!!c?.length
-  } catch {}
-
-  return <div className="shell">
-    <aside className="side">
-      <div className="brand">MTD Lab</div>
-      <div className="nav"><Link href="/">Dashboard</Link><Link href="/taxpayers">Taxpayers</Link><Link href="/taxpayers/demo#connection">HMRC Connection</Link><Link href="/taxpayers/demo#sync">Synchronise HMRC</Link><Link href="/taxpayers/demo#obligations">MTD Obligations</Link></div>
-      <div className="operator">Operated by Glomaxel IT Service</div>
-    </aside>
-    <main className="main">
-      <div className="top"><div><h1 className="pageTitle">Making Tax Digital workspace</h1><p className="muted">HMRC sandbox dashboard for MTD Income Tax development.</p></div><span className={connected?'badge':'badge badgeMuted'}>{connected?'HMRC Connected':'HMRC Not Connected'}</span></div>
-      <div className="cards">
-        <div className="card"><span className="eyebrow">Taxpayers</span><strong>{taxpayerCount}</strong><span className="muted">Configured workspaces</span></div>
-        <div className="card"><span className="eyebrow">Businesses</span><strong>{businessCount}</strong><span className="muted">HMRC income sources</span></div>
-        <div className="card"><span className="eyebrow">Open obligations</span><strong>{openCount}</strong><span className="muted">of {obligationCount} total</span></div>
-        <div className="card"><span className="eyebrow">Next due</span><strong className="dateValue">{fmtDate(nextDue)}</strong><span className="muted">Earliest open obligation</span></div>
-      </div>
-      <div className="two">
-        <section className="panel"><h2>HMRC sandbox taxpayer</h2><p className="muted">Open the connected sandbox taxpayer, review obligations and refresh HMRC data.</p><Link className="btn" href="/taxpayers/demo">Open taxpayer workspace</Link></section>
-        <section className="panel"><h2>Development status</h2><p><span className="statusPill statusDone">OAuth working</span></p><p className="muted">The app is connected to the HMRC sandbox and can retrieve business income sources and obligation periods.</p></section>
-      </div>
-    </main>
-  </div>
+ let taxpayerCount=0,businessCount=0,obligationCount=0,openCount=0,submissionCount=0
+ let nextDue:string|null=null
+ let connected=false
+ let recent:any[]=[]
+ try{const db=supabaseAdmin();const [{count:t},{count:b},{data:o},{data:c},{count:s},{data:r}]=await Promise.all([
+  db.from('taxpayers').select('*',{count:'exact',head:true}),
+  db.from('hmrc_businesses').select('*',{count:'exact',head:true}),
+  db.from('hmrc_obligations').select('due_date,status'),
+  db.from('hmrc_connections').select('id').limit(1),
+  db.from('hmrc_quarterly_submissions').select('*',{count:'exact',head:true}).eq('status','submitted'),
+  db.from('hmrc_quarterly_submissions').select('business_id,period_end,status,submitted_at').eq('status','submitted').order('submitted_at',{ascending:false}).limit(5)
+ ]);taxpayerCount=t||0;businessCount=b||0;obligationCount=o?.length||0;const open=(o||[]).filter((x:any)=>String(x.status).toLowerCase()==='open');openCount=open.length;nextDue=open.map((x:any)=>x.due_date).filter(Boolean).sort()[0]||null;connected=!!c?.length;submissionCount=s||0;recent=r||[]}catch{}
+ const currentTaxYear=taxYearNow()
+ const today=new Date().toLocaleDateString('en-GB',{day:'2-digit',month:'long',year:'numeric'})
+ return <div className="shell"><aside className="side"><div className="brand"><img className="brandLogo" src="/mtd-lab-logo.svg" alt="MTD Lab"/></div><div className="nav"><Link className="navActive" href="/">Dashboard</Link><Link href="/taxpayers">Taxpayers</Link><div className="navGroupLabel">MTD Income Tax</div><Link href="/taxpayers/demo/businesses">Businesses</Link><Link href="/taxpayers/demo/digital-records">Digital Records</Link><Link href="/taxpayers/demo/quarterly">Quarterly Updates</Link><Link href="/taxpayers/demo/end-of-year">End of Year</Link><Link href="/taxpayers/demo/quarterly/history">Submission History</Link></div><div className="operator">Operated by Glomaxel IT Service</div></aside><main className="main"><header className="appHeader"><div className="headerGroup"><span className="taxYearLabel">Tax Year:</span><select className="headerSelect" defaultValue={currentTaxYear} aria-label="Tax year"><option>{currentTaxYear}</option></select></div><div className="headerGroup"><span className={connected?'badge':'badge badgeMuted'}>{connected?'HMRC Connected':'HMRC Not Connected'}</span><div className="profileChip"><span className="profileAvatar">AD</span><span>Admin</span></div><form action="/api/auth/logout" method="post"><button className="btn btnSmall" type="submit">Log out</button></form></div></header><div className="top"><div><h1 className="pageTitle">Dashboard</h1><p className="muted">Overview of your Making Tax Digital for Income Tax workspace.</p></div><div className="panel" style={{padding:'12px 16px'}}><span className="eyebrow">Current date</span><strong>{today}</strong></div></div><div className="cards"><div className="card"><span className="eyebrow">Taxpayers</span><strong>{taxpayerCount}</strong><span className="muted">Configured workspaces</span></div><div className="card"><span className="eyebrow">Businesses</span><strong>{businessCount}</strong><span className="muted">HMRC income sources</span></div><div className="card"><span className="eyebrow">Open obligations</span><strong>{openCount}</strong><span className="muted">of {obligationCount} total</span></div><div className="card"><span className="eyebrow">Submissions</span><strong>{submissionCount}</strong><span className="muted">Accepted quarterly updates</span></div></div><div className="two"><section className="panel"><div className="sectionHead"><div><h2>Upcoming deadline</h2><p className="muted">Earliest open MTD Income Tax obligation.</p></div><Link className="btn btnSmall" href="/taxpayers/demo/quarterly">View obligations</Link></div><div className="detailGrid"><div><span className="eyebrow">Next due</span><strong>{fmtDate(nextDue)}</strong></div><div><span className="eyebrow">Open obligations</span><strong>{openCount}</strong></div></div></section><section className="panel"><div className="sectionHead"><div><h2>Recent submissions</h2><p className="muted">Latest accepted cumulative quarterly updates.</p></div><Link className="btn btnSmall" href="/taxpayers/demo/quarterly/history">View all</Link></div><div className="tableWrap"><table><thead><tr><th>Business ID</th><th>Period end</th><th>Submitted</th></tr></thead><tbody>{recent.length?recent.map((r:any,i:number)=><tr key={`${r.business_id}-${r.period_end}-${i}`}><td className="mono">{r.business_id||'Not supplied'}</td><td>{fmtDate(r.period_end)}</td><td>{r.submitted_at?new Date(r.submitted_at).toLocaleString('en-GB'):'Accepted'}</td></tr>):<tr><td className="empty" colSpan={3}>No accepted submissions recorded yet.</td></tr>}</tbody></table></div></section></div></main></div>
 }
