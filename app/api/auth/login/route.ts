@@ -5,6 +5,7 @@ export async function POST(req:Request){
   const form=await req.formData()
   const username=String(form.get('username')||'').trim()
   const password=String(form.get('password')||'')
+  const remember=String(form.get('remember')||'')==='on'
   const expectedUser=configuredAppUsername()
   const expectedPassword=configuredAppPassword()
   const back=new URL('/login',req.url)
@@ -18,8 +19,9 @@ export async function POST(req:Request){
     return NextResponse.redirect(back,303)
   }
 
-  const token=await createAppSession(username)
+  const maxAge=remember?60*60*24*30:60*60*12
+  const token=await createAppSession(username,maxAge)
   const res=NextResponse.redirect(new URL('/',req.url),303)
-  res.cookies.set('mtdlab_session',token,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge:60*60*12})
+  res.cookies.set('mtdlab_session',token,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge})
   return res
 }
