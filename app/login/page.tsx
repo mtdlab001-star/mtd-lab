@@ -6,7 +6,7 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<Rec
         <img className="loginHeroLogo" src="/mtd-lab-logo-exact.webp" alt="MTD Lab, Making Tax Digital for Income Tax"/>
         <div className="loginBenefits">
           <div><strong>Secure</strong><span>Protected access to your MTD Income Tax workspace.</span></div>
-          <div><strong>Compliant</strong><span>Built around HMRC Making Tax Digital for Income Tax workflows.</span></div>
+          <div><strong>Compliant</strong><span>Built in line with HMRC Making Tax Digital for Income Tax requirements.</span></div>
           <div><strong>Efficient</strong><span>Manage digital records, quarterly updates and year end filing in one place.</span></div>
         </div>
       </section>
@@ -15,8 +15,9 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<Rec
           <h1>Welcome to <span>MTD Lab</span></h1>
           <p className="muted">Sign in to access your MTD Income Tax dashboard.</p>
           <form className="loginForm" method="post" action="/api/auth/login">
-            <div><label htmlFor="username">Username</label><input id="username" name="username" className="field" autoComplete="username" required placeholder="Enter your username"/></div>
-            <div><label htmlFor="password">Password</label><input id="password" name="password" className="field" type="password" autoComplete="current-password" required placeholder="Enter your password"/></div>
+            <div><label htmlFor="username">Username</label><div className="loginInputWrap"><span aria-hidden="true">♙</span><input id="username" name="username" className="field" autoComplete="username" required placeholder="Enter your username"/></div></div>
+            <div><label htmlFor="password">Password</label><div className="loginInputWrap"><span aria-hidden="true">▣</span><input id="password" name="password" className="field" type="password" autoComplete="current-password" required placeholder="Enter your password"/></div></div>
+            <div className="loginOptions"><label><input type="checkbox" name="remember"/> Remember me</label><span>Secure access</span></div>
             <button className="btn loginButton" type="submit">Sign In</button>
           </form>
           {qs.error&&<div className="loginError">{qs.error}</div>}
