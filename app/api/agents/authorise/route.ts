@@ -2,21 +2,28 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 
 function checked(form:FormData,name:string){return String(form.get(name)||'')==='on'}
+function cleanArn(value:string){return value.trim().toUpperCase().replace(/\s+/g,'')}
+function validEmail(value:string){return !value||/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value)}
 
 export async function POST(req:Request){
   const form=await req.formData()
   const taxpayerId=String(form.get('taxpayerId')||'').trim()
   const agentName=String(form.get('agentName')||'').trim()
   const organisationName=String(form.get('organisationName')||'').trim()||null
-  const hmrcArn=String(form.get('hmrcArn')||'').trim().toUpperCase()||null
+  const hmrcArn=cleanArn(String(form.get('hmrcArn')||''))||null
   const email=String(form.get('email')||'').trim().toLowerCase()||null
   const authorisationReference=String(form.get('authorisationReference')||'').trim()||null
   const expiresRaw=String(form.get('expiresAt')||'').trim()
   const notes=String(form.get('notes')||'').trim()||null
   const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/agents`,req.url)
   if(!taxpayerId||!agentName){back.searchParams.set('error','Taxpayer and agent name are required.');return NextResponse.redirect(back,303)}
+  if(!validEmail(email||'')){back.searchParams.set('error','Enter a valid agent email address.');return NextResponse.redirect(back,303)}
+  if(expiresRaw){const expiry=new Date(`${expiresRaw}T23:59:59Z`);if(Number.isNaN(expiry.getTime())||expiry<=new Date()){back.searchParams.set('error','Agent authorisation expiry must be a future date.');return NextResponse.redirect(back,303)}}
   const db=supabaseAdmin()
   try{
+    const {data:taxpayer,error:taxpayerError}=await db.from('taxpayers').select('id').eq('id',taxpayerId).maybeSingle()
+    if(taxpayerError)throw taxpayerError
+    if(!taxpayer){back.searchParams.set('error','Taxpayer workspace was not found.');return NextResponse.redirect(back,303)}
     let agent:any=null
     if(hmrcArn){const {data}=await db.from('mtd_agents').select('*').eq('hmrc_arn',hmrcArn).maybeSingle();agent=data}
     if(!agent&&email){const {data}=await db.from('mtd_agents').select('*').eq('email',email).maybeSingle();agent=data}
