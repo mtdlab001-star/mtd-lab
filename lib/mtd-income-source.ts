@@ -23,7 +23,26 @@ export function isForeignPropertyIncomeSource(b: any) {
   return incomeSourceType(b) === 'foreign-property'
 }
 
+function firstDate(raw:any, keys:string[]){for(const key of keys){const value=raw?.[key];if(typeof value==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(value))return value}return null}
+
+export function incomeSourceStartDate(b:any){
+  const raw=b?.raw||{}
+  return firstDate(raw,['commencementDate','startDate','businessStartDate','incomeSourceStartDate'])
+}
+
+export function incomeSourceCessationDate(b:any){
+  const raw=b?.raw||{}
+  return firstDate(raw,['cessationDate','endDate','businessEndDate','incomeSourceEndDate'])
+}
+
 export function incomeSourceStatus(b: any) {
-  const raw = b?.raw || {}
-  return raw.cessationDate || raw.endDate ? 'Inactive' : 'Active'
+  return incomeSourceCessationDate(b) ? 'Inactive' : 'Active'
+}
+
+export function incomeSourceLifecycleLabel(b:any){
+  const start=incomeSourceStartDate(b)
+  const end=incomeSourceCessationDate(b)
+  if(end)return `Ceased ${end}`
+  if(start)return `Started ${start}`
+  return 'Lifecycle date not supplied by HMRC'
 }
