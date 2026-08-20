@@ -1,0 +1,2 @@
+import { NextResponse } from 'next/server'
+export async function GET(){const csv='business_id,date,type,category,amount,description,document_reference\nBUSINESS_ID,2026-04-06,income,turnover,1000.00,Example sales invoice,INV-001\nBUSINESS_ID,2026-04-07,expense,travelCosts,45.50,Example business travel,REC-001\n';return new NextResponse(csv,{status:200,headers:{'Content-Type':'text/csv; charset=utf-8','Content-Disposition':'attachment; filename="mtd-digital-records-template.csv"','Cache-Control':'no-store'}})}
