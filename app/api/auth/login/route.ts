@@ -1,14 +1,18 @@
 import { NextResponse } from 'next/server'
 import { configuredAppPassword,configuredAppUsername,createAppSession } from '@/lib/app-auth'
 
+function safeNext(value:string){return value.startsWith('/')&&!value.startsWith('//')?value:'/'}
+
 export async function POST(req:Request){
   const form=await req.formData()
   const username=String(form.get('username')||'').trim()
   const password=String(form.get('password')||'')
   const remember=String(form.get('remember')||'')==='on'
+  const next=safeNext(String(form.get('next')||'/'))
   const expectedUser=configuredAppUsername()
   const expectedPassword=configuredAppPassword()
   const back=new URL('/login',req.url)
+  if(next!=='/')back.searchParams.set('next',next)
 
   if(!expectedUser||!expectedPassword||!process.env.MTD_SESSION_SECRET){
     back.searchParams.set('error','Application login has not been configured yet.')
@@ -21,7 +25,7 @@ export async function POST(req:Request){
 
   const maxAge=remember?60*60*24*30:60*60*12
   const token=await createAppSession(username,maxAge)
-  const res=NextResponse.redirect(new URL('/',req.url),303)
+  const res=NextResponse.redirect(new URL(next,req.url),303)
   res.cookies.set('mtdlab_session',token,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge})
   return res
 }
