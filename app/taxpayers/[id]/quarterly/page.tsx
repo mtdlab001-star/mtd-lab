@@ -8,7 +8,23 @@ function fmtDate(value?:string|null){if(!value)return 'Not available';const d=ne
 function fmtDateTime(value?:string|null){if(!value)return '—';const d=new Date(value);return Number.isNaN(d.getTime())?value:d.toLocaleString('en-GB')}
 function taxYearFor(value?:string|null){if(!value)return '';const [y,m,d]=value.split('-').map(Number);const start=m>4||(m===4&&d>=6)?y:y-1;return `${start}/${String(start+1).slice(-2)}`}
 function visualStatus(o:any){const hmrc=String(o.status||'').toLowerCase();if(hmrc==='fulfilled')return {label:'Fulfilled',cls:'statusDone'};const due=o.due_date?new Date(`${o.due_date}T23:59:59Z`):null;const now=new Date();if(due&&due<now)return {label:'Overdue',cls:'statusError'};if(due&&due.getTime()-now.getTime()<1000*60*60*24*30)return {label:'Due soon',cls:'statusOpen'};return {label:'Not due yet',cls:'statusOpen'}}
-function cumulative(records:any[],businessId:string,periodEnd:string){const rs=records.filter(r=>r.business_id===businessId&&r.transaction_date<=periodEnd);const sum=(fn:(r:any)=>boolean)=>rs.filter(fn).reduce((s,r)=>s+Number(r.amount||0),0);const cat=(r:any)=>String(r.category||'').toLowerCase();return {count:rs.length,turnover:sum(r=>r.record_type==='income'&&!cat(r).includes('other')),otherIncome:sum(r=>r.record_type==='income'&&cat(r).includes('other')),costOfGoods:sum(r=>r.record_type==='expense'&&(cat(r).includes('goods')||cat(r).includes('stock')||cat(r).includes('materials'))),staffCosts:sum(r=>r.record_type==='expense'&&(cat(r).includes('staff')||cat(r).includes('wage')||cat(r).includes('salary')),travelCosts:sum(r=>r.record_type==='expense'&&(cat(r).includes('travel')||cat(r).includes('car')||cat(r).includes('vehicle')),premisesCosts:sum(r=>r.record_type==='expense'&&(cat(r).includes('premises')||cat(r).includes('rent')||cat(r).includes('rates')||cat(r).includes('utility')),professionalFees:sum(r=>r.record_type==='expense'&&(cat(r).includes('professional')||cat(r).includes('legal')||cat(r).includes('account')),otherExpenses:sum(r=>r.record_type==='expense'&&!['goods','stock','materials','staff','wage','salary','travel','car','vehicle','premises','rent','rates','utility','professional','legal','account'].some(k=>cat(r).includes(k)))}}
+function cumulative(records:any[],businessId:string,periodEnd:string){
+ const rs=records.filter(r=>r.business_id===businessId&&r.transaction_date<=periodEnd)
+ const sum=(fn:(r:any)=>boolean)=>rs.filter(fn).reduce((s:number,r:any)=>s+Number(r.amount||0),0)
+ const cat=(r:any)=>String(r.category||'').toLowerCase()
+ const has=(r:any,keys:string[])=>keys.some(k=>cat(r).includes(k))
+ return {
+  count:rs.length,
+  turnover:sum(r=>r.record_type==='income'&&!cat(r).includes('other')),
+  otherIncome:sum(r=>r.record_type==='income'&&cat(r).includes('other')),
+  costOfGoods:sum(r=>r.record_type==='expense'&&has(r,['goods','stock','materials'])),
+  staffCosts:sum(r=>r.record_type==='expense'&&has(r,['staff','wage','salary'])),
+  travelCosts:sum(r=>r.record_type==='expense'&&has(r,['travel','car','vehicle'])),
+  premisesCosts:sum(r=>r.record_type==='expense'&&has(r,['premises','rent','rates','utility'])),
+  professionalFees:sum(r=>r.record_type==='expense'&&has(r,['professional','legal','account'])),
+  otherExpenses:sum(r=>r.record_type==='expense'&&!has(r,['goods','stock','materials','staff','wage','salary','travel','car','vehicle','premises','rent','rates','utility','professional','legal','account']))
+ }
+}
 
 export default async function QuarterlyPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
  const {id}=await params;const qs=await searchParams;const db=supabaseAdmin()
