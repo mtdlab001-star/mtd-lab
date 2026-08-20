@@ -6,31 +6,34 @@ export const dynamic='force-dynamic'
 const checks=[
   {title:'API version health',text:'Confirm every HMRC API family is using the centrally approved media type version.',href:'/api/hmrc/version-health',action:'Open version health'},
   {title:'OAuth authorisation',text:'Create the taxpayer workspace, connect to HMRC and authorise with the same sandbox test user.',href:'/taxpayers',action:'Open taxpayers'},
+  {title:'Agent authorisation',text:'Where an agent will act for a taxpayer, record the agent, HMRC ARN or authorisation reference, grant only the required scopes, and test both an allowed and a blocked delegated action.',href:'/agents',action:'Open agents'},
   {title:'Business details and obligations',text:'Synchronise HMRC and confirm modern MTD obligations from 2025/26 onward are retrieved for the selected income sources.',href:'/taxpayers',action:'Open taxpayer workspace'},
-  {title:'Digital records and quarterly update',text:'Add digital records, prepare cumulative totals, review the quarterly update and submit it to HMRC sandbox.',href:'/taxpayers',action:'Open filing workflow'},
+  {title:'Digital records and quarterly update',text:'Add digital records, prepare cumulative totals, review the quarterly update and submit it to HMRC sandbox, directly or through an authorised agent.',href:'/taxpayers',action:'Open filing workflow'},
   {title:'Post submission reconciliation',text:'Confirm an accepted update shows as accepted while HMRC obligation status is refreshing, then synchronise again and verify fulfilment when HMRC updates it.',href:'/taxpayers',action:'Open submission history'},
   {title:'Tax calculation',text:'Trigger an HMRC calculation, retrieve the completed result and confirm the calculation is written to the submission audit trail.',href:'/taxpayers',action:'Open calculations'},
-  {title:'Year end and Final Declaration',text:'Complete the required year end reviews, retrieve the final calculation and validate the guarded Final Declaration journey after the tax year has ended.',href:'/taxpayers',action:'Open year end'},
+  {title:'Year end and Final Declaration',text:'Complete the required year end reviews, retrieve the final calculation and validate both direct and explicitly authorised agent Final Declaration paths after the tax year has ended.',href:'/taxpayers',action:'Open year end'},
 ]
 
 export default async function SandboxTaxpayerPage(){
-  let metrics={workspaces:0,connections:0,syncs:0,quarterly:0,calculations:0,finalDeclarations:0}
+  let metrics={workspaces:0,connections:0,syncs:0,agents:0,agentAuthorisations:0,quarterly:0,calculations:0,finalDeclarations:0}
   try{
     const db=supabaseAdmin()
-    const [t,c,s,q,calc,finals]=await Promise.all([
+    const [t,c,s,a,aa,q,calc,finals]=await Promise.all([
       db.from('taxpayers').select('id',{count:'exact',head:true}),
       db.from('hmrc_connections').select('id',{count:'exact',head:true}),
       db.from('hmrc_sync_runs').select('id',{count:'exact',head:true}).eq('status','complete'),
+      db.from('mtd_agents').select('id',{count:'exact',head:true}).eq('status','active'),
+      db.from('mtd_agent_authorisations').select('id',{count:'exact',head:true}).eq('status','authorised'),
       db.from('hmrc_quarterly_submissions').select('id',{count:'exact',head:true}).eq('status','submitted'),
       db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','tax_calculation_retrieval').eq('status','accepted'),
       db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','final_declaration').eq('status','accepted'),
     ])
-    metrics={workspaces:t.count||0,connections:c.count||0,syncs:s.count||0,quarterly:q.count||0,calculations:calc.count||0,finalDeclarations:finals.count||0}
+    metrics={workspaces:t.count||0,connections:c.count||0,syncs:s.count||0,agents:a.count||0,agentAuthorisations:aa.count||0,quarterly:q.count||0,calculations:calc.count||0,finalDeclarations:finals.count||0}
   }catch{}
   return <div className="shell">
     <aside className="side">
       <div className="brand">MTD Lab</div>
-      <div className="nav"><Link href="/">Dashboard</Link><Link href="/taxpayers">Taxpayers</Link><span>Sandbox setup</span></div>
+      <div className="nav"><Link href="/">Dashboard</Link><Link href="/taxpayers">Taxpayers</Link><Link href="/agents">Agents</Link><span>Sandbox setup</span></div>
       <div className="operator">Operated by Glomaxel IT Service</div>
     </aside>
     <main className="main">
@@ -39,6 +42,8 @@ export default async function SandboxTaxpayerPage(){
         <section className="panel"><div className="muted">Taxpayer workspaces</div><div className="metric">{metrics.workspaces}</div></section>
         <section className="panel"><div className="muted">HMRC connections</div><div className="metric">{metrics.connections}</div></section>
         <section className="panel"><div className="muted">Successful HMRC syncs</div><div className="metric">{metrics.syncs}</div></section>
+        <section className="panel"><div className="muted">Active agents</div><div className="metric">{metrics.agents}</div></section>
+        <section className="panel"><div className="muted">Agent authorisations</div><div className="metric">{metrics.agentAuthorisations}</div></section>
         <section className="panel"><div className="muted">Accepted quarterly updates</div><div className="metric">{metrics.quarterly}</div></section>
         <section className="panel"><div className="muted">Calculations retrieved</div><div className="metric">{metrics.calculations}</div></section>
         <section className="panel"><div className="muted">Final Declarations accepted</div><div className="metric">{metrics.finalDeclarations}</div></section>
