@@ -9,16 +9,20 @@ function money(value: FormDataEntryValue | null) {
 const moneyFields=[
  'turnover','otherIncome','taxTakenOff','costOfGoods','cisPayments','staffCosts','travelCosts','premisesCosts','repairsMaintenance','officeCosts','advertisingCosts','businessEntertainment','interestLoans','financialCharges','badDebts','professionalFees','depreciation','otherExpenses',
  'costOfGoodsDisallowable','cisPaymentsDisallowable','staffCostsDisallowable','travelCostsDisallowable','premisesCostsDisallowable','repairsMaintenanceDisallowable','officeCostsDisallowable','advertisingCostsDisallowable','businessEntertainmentDisallowable','interestLoansDisallowable','financialChargesDisallowable','badDebtsDisallowable','professionalFeesDisallowable','depreciationDisallowable','otherExpensesDisallowable',
- 'rentalIncome','leasePremiums','reversePremiums','otherPropertyIncome','ukTaxDeducted','rentARoomReceived','premisesRunningCosts','financialCosts','costOfServices','otherCosts','rentARoomRelief','residentialFinancialCost','carryForwardResidentialFinanceCost'
+ 'rentalIncome','rents','leasePremiums','reversePremiums','otherPropertyIncome','ukTaxDeducted','rentARoomReceived','premisesRunningCosts','financialCosts','costOfServices','otherCosts','rentARoomRelief','residentialFinancialCost','carryForwardResidentialFinanceCost','propertyExpenses'
 ]
+
+const allowedIncomeSourceTypes=new Set(['self-employment','uk-property','foreign-property'])
 
 export async function POST(req: Request) {
   const form=await req.formData()
   const taxpayerId=String(form.get('taxpayerId')||'demo')
-  const filingType=String(form.get('filingType')||'self-employment')==='property'?'property':'self-employment'
+  const requestedType=String(form.get('incomeSourceType')||form.get('filingType')||'self-employment')
+  const incomeSourceType=allowedIncomeSourceTypes.has(requestedType)?requestedType:'self-employment'
   const payload:any={
     taxpayerId,
-    filingType,
+    incomeSourceType,
+    filingType:incomeSourceType==='self-employment'?'self-employment':'property',
     businessId:String(form.get('businessId')||''),
     periodStart:String(form.get('periodStart')||''),
     periodEnd:String(form.get('periodEnd')||''),
