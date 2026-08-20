@@ -1,0 +1,35 @@
+import Link from 'next/link'
+import { supabaseAdmin } from '@/lib/supabase-admin'
+import { HMRC_API_VERSIONS } from '@/lib/hmrc-api-versions'
+import { expireAgentAuthorisations } from '@/lib/agent-authorisation'
+
+export const dynamic='force-dynamic'
+
+export default async function ReleaseReadinessPage(){
+  const db=supabaseAdmin();try{await expireAgentAuthorisations()}catch{}
+  const [connections,syncs,quarterly,directQuarterly,agentQuarterly,calculations,finals,directFinals,agentFinals]=await Promise.all([
+    db.from('hmrc_connections').select('id',{count:'exact',head:true}),
+    db.from('hmrc_sync_runs').select('id',{count:'exact',head:true}).eq('status','complete'),
+    db.from('hmrc_quarterly_submissions').select('id',{count:'exact',head:true}).eq('status','submitted'),
+    db.from('hmrc_quarterly_submissions').select('id',{count:'exact',head:true}).eq('status','submitted').is('acting_agent_id',null),
+    db.from('hmrc_quarterly_submissions').select('id',{count:'exact',head:true}).eq('status','submitted').not('acting_agent_id','is',null),
+    db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','tax_calculation_retrieval').eq('status','accepted'),
+    db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','final_declaration').eq('status','accepted'),
+    db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','final_declaration').eq('status','accepted').is('acting_agent_id',null),
+    db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','final_declaration').eq('status','accepted').not('acting_agent_id','is',null),
+  ])
+  const env=process.env.HMRC_ENVIRONMENT||'sandbox';const productionEnabled=process.env.HMRC_ALLOW_PRODUCTION_SUBMISSIONS==='true'
+  const configReady=Boolean(process.env.HMRC_CLIENT_ID&&process.env.HMRC_CLIENT_SECRET&&process.env.HMRC_REDIRECT_URI&&process.env.HMRC_STATE_SECRET&&process.env.SUPABASE_SERVICE_ROLE_KEY)
+  const checks=[
+    {name:'Core HMRC and Supabase secrets configured',ok:configReady,detail:configReady?'Required server configuration is present.':'One or more required server environment variables are missing.'},
+    {name:'HMRC connection evidence',ok:(connections.count||0)>0,detail:`${connections.count||0} HMRC connection record(s).`},
+    {name:'Successful HMRC synchronisation',ok:(syncs.count||0)>0,detail:`${syncs.count||0} successful synchronisation run(s).`},
+    {name:'Accepted quarterly update evidence',ok:(quarterly.count||0)>0,detail:`${quarterly.count||0} accepted quarterly update(s). Direct ${directQuarterly.count||0}, agent ${agentQuarterly.count||0}.`},
+    {name:'HMRC calculation retrieval evidence',ok:(calculations.count||0)>0,detail:`${calculations.count||0} accepted calculation retrieval(s).`},
+    {name:'Final Declaration evidence',ok:(finals.count||0)>0,detail:`${finals.count||0} accepted Final Declaration(s). Direct ${directFinals.count||0}, agent ${agentFinals.count||0}.`},
+    {name:'Production submission safety lock',ok:env!=='production'||!productionEnabled,detail:env==='production'?(productionEnabled?'Production submissions are ENABLED. Confirm release approval immediately.':'Production environment detected, submission lock is still active.'):'Sandbox environment active. Production submissions remain isolated.'},
+    {name:'Central HMRC API version registry',ok:Boolean(HMRC_API_VERSIONS),detail:'HMRC API media type versions are centrally controlled.'},
+  ]
+  const passed=checks.filter(c=>c.ok).length;const releaseReady=checks.every(c=>c.ok)&&env==='production'&&productionEnabled
+  return <div className="shell"><aside className="side"><div className="brand">MTD Lab</div><div className="nav"><Link href="/">Dashboard</Link><Link href="/taxpayers">Taxpayers</Link><Link href="/agents">Agents</Link><Link href="/taxpayers/sandbox">Sandbox setup</Link><span>Release readiness</span></div><div className="operator">Operated by Glomaxel IT Service</div></aside><main className="main"><div className="top"><div><h1 className="pageTitle">Stage 2 release readiness</h1><p className="muted">Controlled evidence gate before any production MTD Income Tax submission capability is enabled.</p></div><span className={`statusPill ${releaseReady?'statusDone':'statusOpen'}`}>{releaseReady?'Production ready':'Not production enabled'}</span></div><div className="cards" style={{marginTop:20}}><div className="card"><span className="eyebrow">Checks passed</span><strong>{passed} of {checks.length}</strong></div><div className="card"><span className="eyebrow">HMRC environment</span><strong>{env}</strong></div><div className="card"><span className="eyebrow">Production submissions</span><strong>{productionEnabled?'Enabled':'Locked'}</strong></div><div className="card"><span className="eyebrow">API families controlled</span><strong>{Object.keys(HMRC_API_VERSIONS).length}</strong></div></div><section className="panel" style={{marginTop:16}}><h2>Release gate</h2><div className="tableWrap"><table><thead><tr><th>Control</th><th>Status</th><th>Evidence</th></tr></thead><tbody>{checks.map(c=><tr key={c.name}><td><strong>{c.name}</strong></td><td><span className={`statusPill ${c.ok?'statusDone':'statusOpen'}`}>{c.ok?'Pass':'Pending'}</span></td><td>{c.detail}</td></tr>)}</tbody></table></div></section><div className="status" style={{marginTop:16}}><strong>Safety rule:</strong> MTD Lab should remain in sandbox with production submissions locked until end to end HMRC testing, security review, agent delegated tests, error scenarios and release approval are complete.</div><div style={{display:'flex',gap:8,flexWrap:'wrap',marginTop:16}}><Link className="btn" href="/taxpayers/sandbox">Open sandbox validation</Link><Link className="btn btnSmall" href="/agents">Review agents</Link><a className="btn btnSmall" href="/api/hmrc/version-health" target="_blank" rel="noreferrer">API version health</a></div></main></div>
+}
