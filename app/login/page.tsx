@@ -5,9 +5,9 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<Rec
       <section className="loginHero" aria-label="MTD Lab introduction">
         <img className="loginHeroLogo" src="/mtd-lab-logo-exact.webp" alt="MTD Lab, Making Tax Digital for Income Tax"/>
         <div className="loginBenefits">
-          <div><strong>Secure</strong><span>Protected access to your MTD Income Tax workspace.</span></div>
-          <div><strong>Compliant</strong><span>Built in line with HMRC Making Tax Digital for Income Tax requirements.</span></div>
-          <div><strong>Efficient</strong><span>Manage digital records, quarterly updates and year end filing in one place.</span></div>
+          <div className="loginBenefit"><strong>Secure</strong><span>Protected access to your MTD Income Tax workspace.</span></div>
+          <div className="loginBenefit loginBenefitCompliant"><strong>Compliant</strong><span>Built in line with HMRC Making Tax Digital for Income Tax requirements.</span><img className="hmrcCompliantBadge" src="/hmrc-compliant-badge.webp" alt="HMRC Compliant"/></div>
+          <div className="loginBenefit"><strong>Efficient</strong><span>Manage digital records, quarterly updates and year end filing in one place.</span></div>
         </div>
       </section>
       <section className="loginPanel">
