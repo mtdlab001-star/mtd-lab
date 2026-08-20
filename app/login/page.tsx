@@ -3,7 +3,7 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<Rec
   return <main className="loginPage">
     <div className="loginShell">
       <section className="loginHero" aria-label="MTD Lab introduction">
-        <img className="loginHeroLogo" src="/mtd-lab-logo.svg" alt="MTD Lab, Making Tax Digital for Income Tax"/>
+        <img className="loginHeroLogo" src="/mtd-lab-logo-exact.webp" alt="MTD Lab, Making Tax Digital for Income Tax"/>
         <div className="loginBenefits">
           <div><strong>Secure</strong><span>Protected access to your MTD Income Tax workspace.</span></div>
           <div><strong>Compliant</strong><span>Built around HMRC Making Tax Digital for Income Tax workflows.</span></div>
