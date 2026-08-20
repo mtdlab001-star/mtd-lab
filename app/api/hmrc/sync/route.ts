@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { hmrcGet } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 
 function firstValue(obj:any,keys:string[]){for(const key of keys){const value=obj?.[key];if(value!==undefined&&value!==null&&value!=='')return value}return null}
 function throwIfError(error:any,context:string){if(error)throw new Error(`${context}: ${error.message||JSON.stringify(error)}`)}
@@ -35,7 +36,7 @@ export async function POST(req:Request){
     const {error:taxpayerError}=await db.from('taxpayers').upsert({id:taxpayerId,display_name:taxpayerId==='demo'?'HMRC Sandbox Taxpayer':taxpayerId,nino,mtditid,updated_at:new Date().toISOString()})
     throwIfError(taxpayerError,'Taxpayer update failed')
 
-    const businesses=await hmrcGet(`/individuals/business/details/${encodeURIComponent(nino)}/list`,accessToken,'application/vnd.hmrc.2.0+json')
+    const businesses=await hmrcGet(`/individuals/business/details/${encodeURIComponent(nino)}/list`,accessToken,hmrcAcceptHeader('businessDetails'))
     const list=Array.isArray(businesses?.listOfBusinesses)?businesses.listOfBusinesses:[]
     const {error:deleteBusinessesError}=await db.from('hmrc_businesses').delete().eq('taxpayer_id',taxpayerId)
     throwIfError(deleteBusinessesError,'Deleting existing businesses failed')
@@ -45,23 +46,24 @@ export async function POST(req:Request){
     const currentPath=`/obligations/details/${encodeURIComponent(nino)}/income-and-expenditure?fromDate=${fromDate}&toDate=${toDate}`
     let obligations:any=null
     let all:any[]=[]
+    const obligationsAccept=hmrcAcceptHeader('obligations')
 
     if(process.env.HMRC_ENVIRONMENT!=='production'){
       try{
-        obligations=await hmrcGet(currentPath,accessToken,'application/vnd.hmrc.3.0+json','DYNAMIC')
+        obligations=await hmrcGet(currentPath,accessToken,obligationsAccept,'DYNAMIC')
         all=flattenObligations(obligations)
       }catch{}
     }
 
     if(!hasModernObligation(all)){
       try{
-        obligations=await hmrcGet(currentPath,accessToken,'application/vnd.hmrc.3.0+json','DEFAULT')
+        obligations=await hmrcGet(currentPath,accessToken,obligationsAccept,'DEFAULT')
         all=flattenObligations(obligations)
       }catch{}
     }
 
     if(!hasModernObligation(all)&&process.env.HMRC_ENVIRONMENT!=='production'){
-      obligations=await hmrcGet(`/obligations/details/${encodeURIComponent(nino)}/income-and-expenditure`,accessToken,'application/vnd.hmrc.3.0+json','DEFAULT')
+      obligations=await hmrcGet(`/obligations/details/${encodeURIComponent(nino)}/income-and-expenditure`,accessToken,obligationsAccept,'DEFAULT')
       all=flattenObligations(obligations)
     }
 
