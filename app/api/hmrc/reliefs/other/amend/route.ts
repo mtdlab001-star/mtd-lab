@@ -4,12 +4,14 @@ import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
 import { markYearEndReviewed } from '@/lib/year-end-review'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 function num(f:FormData,k:string){const r=String(f.get(k)||'').trim();if(!r)return undefined;const v=Number(r);return Number.isFinite(v)&&v>=0?v:undefined}
 function text(f:FormData,k:string){const v=String(f.get(k)||'').trim();return v||undefined}
 function refAmount(f:FormData,p:string,amountKey='reliefClaimed'){const customerReference=text(f,`${p}Ref`),amount=num(f,`${p}Amount`);if(!customerReference&&amount===undefined)return undefined;if(!customerReference||amount===undefined)throw new Error(`${p} requires customer reference and amount.`);return {customerReference,[amountKey]:amount}}
 
 export async function POST(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const f=await req.formData();const taxpayerId=String(f.get('taxpayerId')||'demo'),taxYear=String(f.get('taxYear')||'');const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/end-of-year/reliefs`,req.url);back.searchParams.set('taxYear',taxYear);back.searchParams.set('type','other')
  try{if(!/^20\d{2}-\d{2}$/.test(taxYear))throw new Error('Select a valid HMRC tax year');const payload:any={};const ndi=refAmount(f,'nonDeductible');if(ndi)payload.nonDeductibleLoanInterest=ndi;const pg=refAmount(f,'payrollGiving');if(pg)payload.payrollGiving=pg;const qd=refAmount(f,'qualifyingDistribution','amount');if(qd)payload.qualifyingDistributionRedemptionOfSharesAndSecurities=qd;const annual=refAmount(f,'annualPayments');if(annual)payload.annualPaymentsMade=annual;
  const maintRef=text(f,'maintenanceRef'),maintName=text(f,'maintenanceName'),maintDob=text(f,'maintenanceDob'),maintAmount=num(f,'maintenanceAmount');if(maintRef||maintName||maintDob||maintAmount!==undefined){if(!maintRef||!maintName||!maintDob||maintAmount===undefined)throw new Error('Maintenance payments require reference, ex spouse name, date of birth and amount.');payload.maintenancePayments=[{customerReference:maintRef,exSpouseName:maintName,exSpouseDateOfBirth:maintDob,amount:maintAmount}]}
