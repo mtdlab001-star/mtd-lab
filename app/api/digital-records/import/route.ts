@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 function taxYear(d:string){const x=new Date(`${d}T12:00:00Z`);const y=x.getUTCFullYear(),m=x.getUTCMonth()+1,day=x.getUTCDate();const s=m>4||(m===4&&day>=6)?y:y-1;return `${s}-${String(s+1).slice(-2)}`}
 function parseCsv(text:string){const rows:string[][]=[];let row:string[]=[],cell='',quoted=false;for(let i=0;i<text.length;i++){const c=text[i];if(c==='"'){if(quoted&&text[i+1]==='"'){cell+='"';i++}else quoted=!quoted}else if(c===','&&!quoted){row.push(cell);cell=''}else if((c==='\n'||c==='\r')&&!quoted){if(c==='\r'&&text[i+1]==='\n')i++;row.push(cell);cell='';if(row.some(v=>v.trim()!==''))rows.push(row);row=[]}else cell+=c}row.push(cell);if(row.some(v=>v.trim()!==''))rows.push(row);return rows}
 
 export async function POST(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const f=await req.formData();const taxpayerId=String(f.get('taxpayerId')||'');const file=f.get('file');const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/digital-records`,req.url)
  if(!taxpayerId||!(file instanceof File)){back.searchParams.set('error','Choose a CSV file to import.');return NextResponse.redirect(back,303)}
  if(file.size>2_000_000){back.searchParams.set('error','CSV file is too large. Maximum size is 2 MB.');return NextResponse.redirect(back,303)}
