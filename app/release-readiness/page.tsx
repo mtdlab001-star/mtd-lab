@@ -2,13 +2,14 @@ import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { HMRC_API_VERSIONS } from '@/lib/hmrc-api-versions'
 import { expireAgentAuthorisations } from '@/lib/agent-authorisation'
+import { assessHmrcConnection } from '@/lib/hmrc-connection-status'
 
 export const dynamic='force-dynamic'
 
 export default async function ReleaseReadinessPage(){
   const db=supabaseAdmin();try{await expireAgentAuthorisations()}catch{}
   const [connections,syncs,quarterly,directQuarterly,agentQuarterly,calculations,finals,directFinals,agentFinals]=await Promise.all([
-    db.from('hmrc_connections').select('id',{count:'exact',head:true}),
+    db.from('hmrc_connections').select('access_token,refresh_token,token_expires_at,scope'),
     db.from('hmrc_sync_runs').select('id',{count:'exact',head:true}).eq('status','complete'),
     db.from('hmrc_quarterly_submissions').select('id',{count:'exact',head:true}).eq('status','submitted'),
     db.from('hmrc_quarterly_submissions').select('id',{count:'exact',head:true}).eq('status','submitted').is('acting_agent_id',null),
@@ -18,11 +19,14 @@ export default async function ReleaseReadinessPage(){
     db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','final_declaration').eq('status','accepted').is('acting_agent_id',null),
     db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','final_declaration').eq('status','accepted').not('acting_agent_id','is',null),
   ])
+  const connectionStatuses=(connections.data||[]).map(c=>assessHmrcConnection(c))
+  const usableConnections=connectionStatuses.filter(c=>c.usable).length
+  const reconnectRequired=connectionStatuses.filter(c=>c.connected&&!c.usable).length
   const env=process.env.HMRC_ENVIRONMENT||'sandbox';const productionEnabled=process.env.HMRC_ALLOW_PRODUCTION_SUBMISSIONS==='true'
   const configReady=Boolean(process.env.HMRC_CLIENT_ID&&process.env.HMRC_CLIENT_SECRET&&process.env.HMRC_REDIRECT_URI&&process.env.HMRC_STATE_SECRET&&process.env.SUPABASE_SERVICE_ROLE_KEY)
   const evidenceChecks=[
     {name:'Core HMRC and Supabase secrets configured',ok:configReady,detail:configReady?'Required server configuration is present.':'One or more required server environment variables are missing.'},
-    {name:'HMRC connection evidence',ok:(connections.count||0)>0,detail:`${connections.count||0} HMRC connection record(s).`},
+    {name:'Usable HMRC connection evidence',ok:usableConnections>0,detail:`${usableConnections} usable HMRC connection(s). ${reconnectRequired} require reconnect.`},
     {name:'Successful HMRC synchronisation',ok:(syncs.count||0)>0,detail:`${syncs.count||0} successful synchronisation run(s).`},
     {name:'Accepted quarterly update evidence',ok:(quarterly.count||0)>0,detail:`${quarterly.count||0} accepted quarterly update(s). Direct ${directQuarterly.count||0}, agent ${agentQuarterly.count||0}.`},
     {name:'Direct quarterly filing tested',ok:(directQuarterly.count||0)>0,detail:`${directQuarterly.count||0} accepted direct quarterly update(s).`},
