@@ -1,14 +1,14 @@
 export default async function LoginPage({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){
   const qs=await searchParams
-  const badgeStyle={width:76,height:76,borderRadius:'50%',margin:'14px auto 0',display:'flex',flexDirection:'column' as const,alignItems:'center',justifyContent:'center',border:'2px solid #19e4ff',background:'radial-gradient(circle at 35% 28%,#0a6f87 0%,#042437 58%,#020b17 100%)',boxShadow:'0 0 12px rgba(0,224,255,.42)',color:'#fff',lineHeight:1}
+  const hmrcMark=<div className="loginHmrcMark" aria-label="HMRC Compliant"><span aria-hidden="true">✓</span><b>HMRC</b><small>COMPLIANT</small></div>
   return <main className="loginPage">
     <div className="loginShell">
       <section className="loginHero" aria-label="MTD Lab introduction">
         <img className="loginHeroLogo" src="/mtd-lab-logo-exact.webp" alt="MTD Lab, Making Tax Digital for Income Tax"/>
         <div className="loginBenefits">
-          <div className="loginBenefit"><strong>Secure</strong><span>Protected access to your MTD Income Tax workspace.</span></div>
-          <div className="loginBenefit loginBenefitCompliant"><strong>Compliant</strong><span>Built in line with HMRC Making Tax Digital for Income Tax requirements.</span><div style={badgeStyle} aria-label="HMRC Compliant"><span aria-hidden="true" style={{fontSize:15,color:'#fff',lineHeight:1}}>♛</span><b style={{fontSize:15,letterSpacing:'.02em',marginTop:2}}>HMRC</b><small style={{fontSize:7,fontWeight:800,letterSpacing:'.08em',marginTop:2}}>COMPLIANT</small><i aria-hidden="true" style={{fontSize:10,color:'#31f1df',fontStyle:'normal',marginTop:2}}>✓</i></div></div>
-          <div className="loginBenefit"><strong>Efficient</strong><span>Manage digital records, quarterly updates and year end filing in one place.</span></div>
+          <div className="loginBenefit"><strong>Secure</strong><span>Protected access to your MTD Income Tax workspace.</span>{hmrcMark}</div>
+          <div className="loginBenefit loginBenefitCompliant"><strong>Compliant</strong><span>Built in line with HMRC Making Tax Digital for Income Tax requirements.</span>{hmrcMark}</div>
+          <div className="loginBenefit"><strong>Efficient</strong><span>Manage digital records, quarterly updates and year end filing in one place.</span>{hmrcMark}</div>
         </div>
       </section>
       <section className="loginPanel">
