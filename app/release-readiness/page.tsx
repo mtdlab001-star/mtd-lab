@@ -8,7 +8,7 @@ export const dynamic='force-dynamic'
 
 export default async function ReleaseReadinessPage(){
   const db=supabaseAdmin();try{await expireAgentAuthorisations()}catch{}
-  const [connections,syncs,quarterly,directQuarterly,agentQuarterly,calculations,finals,directFinals,agentFinals]=await Promise.all([
+  const [connections,syncs,quarterly,directQuarterly,agentQuarterly,calculations,finals,directFinals,agentFinals,loginAttempts]=await Promise.all([
     db.from('hmrc_connections').select('access_token,refresh_token,token_expires_at,scope'),
     db.from('hmrc_sync_runs').select('id',{count:'exact',head:true}).eq('status','complete'),
     db.from('hmrc_quarterly_submissions').select('id',{count:'exact',head:true}).eq('status','submitted'),
@@ -18,6 +18,7 @@ export default async function ReleaseReadinessPage(){
     db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','final_declaration').eq('status','accepted'),
     db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','final_declaration').eq('status','accepted').is('acting_agent_id',null),
     db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','final_declaration').eq('status','accepted').not('acting_agent_id','is',null),
+    db.from('app_login_attempts').select('id',{count:'exact',head:true}),
   ])
   const connectionStatuses=(connections.data||[]).map(c=>assessHmrcConnection(c))
   const usableConnections=connectionStatuses.filter(c=>c.usable).length
@@ -33,6 +34,7 @@ export default async function ReleaseReadinessPage(){
     {name:'Agent delegated quarterly filing tested',ok:(agentQuarterly.count||0)>0,detail:`${agentQuarterly.count||0} accepted delegated quarterly update(s).`},
     {name:'HMRC calculation retrieval evidence',ok:(calculations.count||0)>0,detail:`${calculations.count||0} accepted calculation retrieval(s).`},
     {name:'Final Declaration evidence',ok:(finals.count||0)>0,detail:`${finals.count||0} accepted Final Declaration(s). Direct ${directFinals.count||0}, agent ${agentFinals.count||0}.`},
+    {name:'Login abuse audit storage',ok:!loginAttempts.error,detail:loginAttempts.error?'Login attempt audit table is unavailable.':'Login attempt audit and rate limit storage is available.'},
     {name:'Central HMRC API version registry',ok:Boolean(HMRC_API_VERSIONS),detail:'HMRC API media type versions are centrally controlled.'},
   ]
   const safetyLock={name:'Production submission safety lock',ok:env!=='production'||!productionEnabled,detail:env==='production'?(productionEnabled?'Production submissions are enabled. Confirm explicit release approval and monitoring.':'Production environment detected, submission lock remains active.'):'Sandbox environment active. Production submissions remain isolated.'}
