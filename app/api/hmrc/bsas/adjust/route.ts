@@ -3,12 +3,14 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 function amount(form:FormData,key:string){const raw=String(form.get(key)||'').trim();if(!raw)return undefined;const n=Number(raw);return Number.isFinite(n)?n:undefined}
 function clean(obj:any):any{if(Array.isArray(obj))return obj.map(clean);if(obj&&typeof obj==='object'){const out:any={};for(const [k,v] of Object.entries(obj)){const c=clean(v);if(c!==undefined&&(typeof c!=='object'||Object.keys(c).length))out[k]=c}return out}return obj}
 async function reviewed(taxpayerId:string,taxYear:string){await supabaseAdmin().from('mtd_year_end_reviews').upsert({taxpayer_id:taxpayerId,tax_year:taxYear,schedule_key:'adjustments',status:'reviewed',notes:'Accounting adjustments submitted successfully to HMRC.',reviewed_at:new Date().toISOString()},{onConflict:'taxpayer_id,tax_year,schedule_key'})}
 
 export async function POST(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const form=await req.formData();const taxpayerId=String(form.get('taxpayerId')||'demo');const taxYear=String(form.get('taxYear')||'');const calculationId=String(form.get('calculationId')||'').trim();const type=String(form.get('typeOfBusiness')||'self-employment');const expenseMode=String(form.get('expenseMode')||'consolidated')
  const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/end-of-year/adjustments`,req.url);back.searchParams.set('taxYear',taxYear)
  if(!/^20\d{2}-\d{2}$/.test(taxYear)||!calculationId){back.searchParams.set('error','A valid tax year and BSAS calculation ID are required');return NextResponse.redirect(back,303)}
