@@ -3,8 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 export async function POST(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const form=await req.formData();const taxpayerId=String(form.get('taxpayerId')||'demo');const taxYear=String(form.get('taxYear')||'');const confirm=String(form.get('confirmDelete')||'')
  const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/end-of-year/other-income`,req.url);back.searchParams.set('taxYear',taxYear)
  if(confirm!=='yes'){back.searchParams.set('error','Confirm that you want to delete the HMRC Other Income record before continuing.');return NextResponse.redirect(back,303)}
