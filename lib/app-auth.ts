@@ -8,6 +8,18 @@ async function hmac(value:string){
   return Array.from(new Uint8Array(sig)).map(b=>b.toString(16).padStart(2,'0')).join('')
 }
 
+async function digest(value:string){
+  return new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(value)))
+}
+
+export async function constantTimeEqual(actual:string,expected:string){
+  const actualHash=await digest(actual)
+  const expectedHash=await digest(expected)
+  let diff=actual.length===expected.length?0:1
+  for(let i=0;i<actualHash.length;i++) diff|=actualHash[i]^expectedHash[i]
+  return diff===0
+}
+
 export async function createAppSession(username:string,maxAgeSeconds=60*60*12){
   if(!secret()) throw new Error('MTD_SESSION_SECRET is not configured')
   const safeMaxAge=Math.max(60*15,Math.min(maxAgeSeconds,60*60*24*30))
