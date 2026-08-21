@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 430" role="img" aria-labelledby="title desc">
+<title id="title">MTD Lab</title><desc id="desc">Making Tax Digital for Income Tax</desc>
+<defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#00b8ff"/><stop offset=".55" stop-color="#315cff"/><stop offset="1" stop-color="#b51cff"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="5" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs>
+<g transform="translate(72 40)">
+<path d="M0 185V30h52l104 91L260 30h55v155h-52V90l-107 94L52 92v93z" fill="#fff"/>
+<path d="M291 30h101c83 0 127 30 127 78 0 50-44 78-127 78h-118l42-47h77c44 0 68-11 68-31 0-19-23-30-68-30h-135z" fill="url(#g)"/>
+<path d="M0 232h78M476 232h78" stroke="url(#g)" stroke-width="7" stroke-linecap="round" filter="url(#glow)"/>
+<text x="277" y="253" text-anchor="middle" font-family="Arial,Helvetica,sans-serif" font-size="72" font-weight="800" letter-spacing="11"><tspan fill="#fff">MTD</tspan><tspan fill="url(#g)"> LAB</tspan></text>
+<text x="277" y="326" text-anchor="middle" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-size="31" font-weight="700">Making Tax Digital for Income Tax</text>
+</g></svg>
