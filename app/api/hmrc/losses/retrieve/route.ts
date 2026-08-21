@@ -3,8 +3,10 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 export async function POST(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const form=await req.formData()
  const taxpayerId=String(form.get('taxpayerId')||'demo')
  const taxYear=String(form.get('taxYear')||'')
