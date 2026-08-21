@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { signReviewPayload } from '@/lib/review-token'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 function money(value: FormDataEntryValue | null) {
   const n=Number(value||0)
@@ -15,6 +16,7 @@ const moneyFields=[
 const allowedIncomeSourceTypes=new Set(['self-employment','uk-property','foreign-property'])
 
 export async function POST(req: Request) {
+  if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
   const form=await req.formData()
   const taxpayerId=String(form.get('taxpayerId')||'demo')
   const requestedType=String(form.get('incomeSourceType')||form.get('filingType')||'self-employment')
