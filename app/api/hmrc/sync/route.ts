@@ -3,6 +3,7 @@ import { hmrcGet } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 function firstValue(obj:any,keys:string[]){for(const key of keys){const value=obj?.[key];if(value!==undefined&&value!==null&&value!=='')return value}return null}
 function throwIfError(error:any,context:string){if(error)throw new Error(`${context}: ${error.message||JSON.stringify(error)}`)}
@@ -26,6 +27,7 @@ function hasModernObligation(rows:any[]){
 }
 
 export async function POST(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
   const form=await req.formData()
   const taxpayerId=String(form.get('taxpayerId')||'demo')
   const nino=String(form.get('nino')||'').trim().toUpperCase()
