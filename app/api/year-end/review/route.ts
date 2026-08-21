@@ -1,10 +1,12 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 const allowedSections=new Set(['adjustments','tax-liability','reliefs','other-income','state-benefits','employment'])
 const allowedStatuses=new Set(['reviewed','not_applicable','action_required'])
 
 export async function POST(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const form=await req.formData();const taxpayerId=String(form.get('taxpayerId')||'');const taxYear=String(form.get('taxYear')||'');const section=String(form.get('section')||'');const status=String(form.get('status')||'reviewed');const note=String(form.get('note')||'').trim()
  const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/end-of-year`,req.url);back.searchParams.set('taxYear',taxYear)
  if(!taxpayerId||!/^20\d{2}-\d{2}$/.test(taxYear)||!allowedSections.has(section)||!allowedStatuses.has(status)){back.searchParams.set('reviewError','Invalid year end review update');return NextResponse.redirect(back,303)}
