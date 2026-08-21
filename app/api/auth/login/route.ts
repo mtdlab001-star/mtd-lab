@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { configuredAppPassword,configuredAppUsername,createAppSession } from '@/lib/app-auth'
+import { configuredAppPassword,configuredAppUsername,constantTimeEqual,createAppSession } from '@/lib/app-auth'
 
 function safeNext(value:string){return value.startsWith('/')&&!value.startsWith('//')?value:'/'}
 
@@ -18,7 +18,9 @@ export async function POST(req:Request){
     back.searchParams.set('error','Application login has not been configured yet.')
     return NextResponse.redirect(back,303)
   }
-  if(username!==expectedUser||password!==expectedPassword){
+  const validUser=await constantTimeEqual(username,expectedUser)
+  const validPassword=await constantTimeEqual(password,expectedPassword)
+  if(!validUser||!validPassword){
     back.searchParams.set('error','Username or password is incorrect.')
     return NextResponse.redirect(back,303)
   }
