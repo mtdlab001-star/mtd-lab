@@ -4,11 +4,13 @@ import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
 import { markYearEndReviewed } from '@/lib/year-end-review'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 function num(form:FormData,key:string){const raw=String(form.get(key)||'').trim();if(!raw)return undefined;const n=Number(raw);return Number.isFinite(n)&&n>=0?n:undefined}
 function clean(obj:any):any{if(obj&&typeof obj==='object'&&!Array.isArray(obj))return Object.fromEntries(Object.entries(obj).filter(([,v])=>v!==undefined).map(([k,v])=>[k,clean(v)]));return obj}
 
 export async function POST(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const form=await req.formData();const taxpayerId=String(form.get('taxpayerId')||'demo');const taxYear=String(form.get('taxYear')||'')
  const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/end-of-year/reliefs`,req.url);back.searchParams.set('taxYear',taxYear);back.searchParams.set('type','pensions')
  if(!/^20\d{2}-\d{2}$/.test(taxYear)){back.searchParams.set('error','Select a valid HMRC tax year');return NextResponse.redirect(back,303)}
