@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 function amount(form:FormData,key:string){const raw=String(form.get(key)||'').trim();if(!raw)return undefined;const n=Number(raw);return Number.isFinite(n)?n:undefined}
 function clean(obj:any):any{if(obj&&typeof obj==='object'&&!Array.isArray(obj))return Object.fromEntries(Object.entries(obj).filter(([,v])=>v!==undefined).map(([k,v])=>[k,clean(v)]));return obj}
@@ -10,6 +11,7 @@ function ended(taxYear:string){const y=Number(taxYear.slice(0,4));return new Dat
 async function reviewed(taxpayerId:string,taxYear:string){await supabaseAdmin().from('mtd_year_end_reviews').upsert({taxpayer_id:taxpayerId,tax_year:taxYear,schedule_key:'tax_liability',status:'reviewed',notes:'Tax liability adjustments submitted successfully to HMRC.',reviewed_at:new Date().toISOString()},{onConflict:'taxpayer_id,tax_year,schedule_key'})}
 
 export async function POST(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const form=await req.formData();const taxpayerId=String(form.get('taxpayerId')||'demo');const taxYear=String(form.get('taxYear')||'')
  const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/end-of-year/tax-liability`,req.url);back.searchParams.set('taxYear',taxYear)
  if(!/^20\d{2}-\d{2}$/.test(taxYear)){back.searchParams.set('error','Select a valid HMRC tax year');return NextResponse.redirect(back,303)}
