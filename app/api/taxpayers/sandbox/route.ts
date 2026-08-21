@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 function cleanNino(v:string){return v.trim().toUpperCase().replace(/\s+/g,'')}
 function cleanMtditid(v:string){return v.trim().toUpperCase().replace(/\s+/g,'')}
 
 export async function POST(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
   const form=await req.formData()
   const displayName=String(form.get('displayName')||'HMRC Sandbox Taxpayer').trim()
   const nino=cleanNino(String(form.get('nino')||''))
