@@ -2,18 +2,31 @@ import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { verifyAppSession } from './lib/app-auth'
 
+const securityHeaders=[
+  ['Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"],
+  ['X-Frame-Options','DENY'],
+  ['X-Content-Type-Options','nosniff'],
+  ['Referrer-Policy','strict-origin-when-cross-origin'],
+  ['Permissions-Policy','camera=(), microphone=(), geolocation=(), payment=(), usb=()'],
+] as const
+
+function secure(res:NextResponse){
+  for(const [key,value] of securityHeaders)res.headers.set(key,value)
+  return res
+}
+
 export async function middleware(req:NextRequest){
   const path=req.nextUrl.pathname
   const publicAsset=/\.(?:png|jpe?g|webp|svg|ico)$/i.test(path)
-  if(path==='/login'||publicAsset||path.startsWith('/api/auth/')||path.startsWith('/_next/')) return NextResponse.next()
+  if(path==='/login'||publicAsset||path.startsWith('/api/auth/')||path.startsWith('/_next/')) return secure(NextResponse.next())
   const valid=await verifyAppSession(req.cookies.get('mtdlab_session')?.value)
-  if(valid) return NextResponse.next()
+  if(valid) return secure(NextResponse.next())
   const login=req.nextUrl.clone()
   login.pathname='/login'
   login.search=''
   const requested=`${req.nextUrl.pathname}${req.nextUrl.search}`
   if(requested.startsWith('/')&&!requested.startsWith('//')) login.searchParams.set('next',requested)
-  return NextResponse.redirect(login)
+  return secure(NextResponse.redirect(login))
 }
 
 export const config={matcher:['/((?!favicon.ico|robots.txt|sitemap.xml).*)']}
