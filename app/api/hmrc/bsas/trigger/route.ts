@@ -3,10 +3,12 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 function yearDates(taxYear:string){const start=Number(taxYear.slice(0,4));return {startDate:`${start}-04-06`,endDate:`${start+1}-04-05`}}
 
 export async function POST(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const form=await req.formData()
  const taxpayerId=String(form.get('taxpayerId')||'demo')
  const taxYear=String(form.get('taxYear')||'')
