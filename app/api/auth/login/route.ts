@@ -1,9 +1,11 @@
 import { NextResponse } from 'next/server'
 import { configuredAppPassword,configuredAppUsername,constantTimeEqual,createAppSession } from '@/lib/app-auth'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 function safeNext(value:string){return value.startsWith('/')&&!value.startsWith('//')?value:'/'}
 
 export async function POST(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
   const form=await req.formData()
   const username=String(form.get('username')||'').trim()
   const password=String(form.get('password')||'')
