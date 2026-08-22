@@ -1,11 +1,13 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 function esc(v:any){return String(v??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]||c))}
 function sourceType(r:any){const raw=r?.request_payload||{};const type=String(raw?.incomeSourceType||raw?.payload?.incomeSourceType||'').toLowerCase();if(type.includes('foreign'))return 'Foreign Property';if(type.includes('property'))return 'UK Property';return 'Self Employment'}
 function reconciliationStatus(r:any,obligations:any[]){if(r.status!=='submitted')return r.status||'unknown';const o=obligations.find((x:any)=>x.period_end===r.period_end&&(!x.business_id||x.business_id===r.business_id));if(String(o?.status||'').toLowerCase()==='fulfilled')return 'Accepted, obligation fulfilled';return 'Accepted, obligation open'}
 
 export async function GET(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const u=new URL(req.url);const taxpayerId=String(u.searchParams.get('taxpayerId')||'');const taxYear=String(u.searchParams.get('taxYear')||'')
  if(!taxpayerId||!/^20\d{2}-\d{2}$/.test(taxYear))return new NextResponse('Taxpayer and tax year are required',{status:400})
  const db=supabaseAdmin();const startYear=Number(taxYear.slice(0,4))
