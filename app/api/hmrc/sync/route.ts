@@ -26,6 +26,21 @@ function hasModernObligation(rows:any[]){
   return rows.some((o:any)=>String(firstValue(o,['periodStartDate','inboundCorrespondenceFrom','start','PeriodStartDate'])||'')>='2025-04-06')
 }
 
+function dedupeObligations(rows:any[]){
+  const map=new Map<string,any>()
+  for(const row of rows){
+    const key=[
+      row.businessId||'',
+      firstValue(row,['periodStartDate','inboundCorrespondenceFrom','start','PeriodStartDate'])||'',
+      firstValue(row,['periodEndDate','inboundCorrespondenceTo','end','PeriodEndDate'])||'',
+      firstValue(row,['dueDate','inboundCorrespondenceDueDate','due','DueDate'])||'',
+      String(firstValue(row,['status','Status'])||'').toLowerCase(),
+    ].join('|')
+    if(!map.has(key))map.set(key,row)
+  }
+  return Array.from(map.values())
+}
+
 export async function POST(req:Request){
  if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
   const form=await req.formData()
@@ -69,11 +84,12 @@ export async function POST(req:Request){
       all=flattenObligations(obligations)
     }
 
+    const uniqueObligations=dedupeObligations(all)
     const {error:deleteObligationsError}=await db.from('hmrc_obligations').delete().eq('taxpayer_id',taxpayerId)
     throwIfError(deleteObligationsError,'Deleting existing obligations failed')
-    if(all.length){const rows=all.map((o:any)=>({taxpayer_id:taxpayerId,business_id:o.businessId,period_start:firstValue(o,['periodStartDate','inboundCorrespondenceFrom','start','PeriodStartDate']),period_end:firstValue(o,['periodEndDate','inboundCorrespondenceTo','end','PeriodEndDate']),due_date:firstValue(o,['dueDate','inboundCorrespondenceDueDate','due','DueDate']),status:firstValue(o,['status','Status']),received_date:firstValue(o,['receivedDate','inboundCorrespondenceDateReceived','inboundCorrespondenceReceivedDate','received','ReceivedDate']),raw:o}));const {error}=await db.from('hmrc_obligations').insert(rows);throwIfError(error,'Saving obligations failed')}
+    if(uniqueObligations.length){const rows=uniqueObligations.map((o:any)=>({taxpayer_id:taxpayerId,business_id:o.businessId,period_start:firstValue(o,['periodStartDate','inboundCorrespondenceFrom','start','PeriodStartDate']),period_end:firstValue(o,['periodEndDate','inboundCorrespondenceTo','end','PeriodEndDate']),due_date:firstValue(o,['dueDate','inboundCorrespondenceDueDate','due','DueDate']),status:firstValue(o,['status','Status']),received_date:firstValue(o,['receivedDate','inboundCorrespondenceDateReceived','inboundCorrespondenceReceivedDate','received','ReceivedDate']),raw:o}));const {error}=await db.from('hmrc_obligations').insert(rows);throwIfError(error,'Saving obligations failed')}
 
-    const {error:syncLogError}=await db.from('hmrc_sync_runs').insert({taxpayer_id:taxpayerId,status:'complete',businesses_count:list.length,obligations_count:all.length,completed_at:new Date().toISOString()})
+    const {error:syncLogError}=await db.from('hmrc_sync_runs').insert({taxpayer_id:taxpayerId,status:'complete',businesses_count:list.length,obligations_count:uniqueObligations.length,completed_at:new Date().toISOString()})
     throwIfError(syncLogError,'Saving sync log failed')
     return NextResponse.redirect(new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}?synced=1`,req.url),303)
   }catch(e:any){
