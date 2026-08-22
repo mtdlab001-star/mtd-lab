@@ -4,11 +4,12 @@ import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
 import { isSameOriginRequest } from '@/lib/request-security'
+import { markYearEndReviewed } from '@/lib/year-end-review'
 
 function amount(form:FormData,key:string){const raw=String(form.get(key)||'').trim();if(!raw)return undefined;const n=Number(raw);return Number.isFinite(n)?n:undefined}
 function clean(obj:any):any{if(obj&&typeof obj==='object'&&!Array.isArray(obj)){const out:any={};for(const [k,v] of Object.entries(obj)){const c=clean(v);if(c!==undefined&&(typeof c!=='object'||Object.keys(c).length))out[k]=c}return out}return obj}
 function yearEnded(taxYear:string){const start=Number(taxYear.slice(0,4));return new Date()>new Date(`${start+1}-04-05T23:59:59Z`)}
-async function reviewed(taxpayerId:string,taxYear:string){await supabaseAdmin().from('mtd_year_end_reviews').upsert({taxpayer_id:taxpayerId,tax_year:taxYear,schedule_key:'losses',status:'reviewed',notes:'Losses and claims submitted successfully to HMRC.',reviewed_at:new Date().toISOString()},{onConflict:'taxpayer_id,tax_year,schedule_key'})}
+async function reviewed(taxpayerId:string,taxYear:string){await markYearEndReviewed(taxpayerId,taxYear,'adjustments','Losses and claims submitted successfully to HMRC.')}
 
 export async function POST(req:Request){
  if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
