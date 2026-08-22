@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 export async function GET(req:Request){
+ if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const url=new URL(req.url);const taxpayerId=String(url.searchParams.get('taxpayerId')||'demo');const taxYear=String(url.searchParams.get('taxYear')||'');const employmentId=String(url.searchParams.get('employmentId')||'')
  const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/end-of-year/employment`,req.url);back.searchParams.set('taxYear',taxYear)
  if(!/^20\d{2}-\d{2}$/.test(taxYear)||!employmentId){back.searchParams.set('error','A valid tax year and employment ID are required');return NextResponse.redirect(back,303)}
