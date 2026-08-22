@@ -111,6 +111,6 @@ export async function pruneLoginAttemptAudit() {
     const { error } = await supabaseAdmin().from('app_login_attempts').delete().lt('created_at', before)
     if (error) throw error
   } catch (error) {
-    console.error('Login attempt audit pruning failed', error)
+    console.warn('Login attempt audit pruning skipped', error)
   }
 }
