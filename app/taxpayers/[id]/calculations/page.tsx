@@ -4,7 +4,8 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 export const dynamic='force-dynamic'
 function taxYearFromDate(value:string){const [y,m,d]=value.split('-').map(Number);const start=m>4||(m===4&&d>=6)?y:y-1;return `${start}-${String(start+1).slice(-2)}`}
 function decode(value?:string){try{return value?JSON.parse(Buffer.from(value,'base64url').toString('utf8')):null}catch{return null}}
-function gbp(v:any){const n=Number(v);return Number.isFinite(n)?new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(n):'Not available'}
+function isHmrcSandboxPlaceholder(n:number){return Math.abs(n)>=99999999999}
+function gbp(v:any){const n=Number(v);return Number.isFinite(n)?(isHmrcSandboxPlaceholder(n)?'HMRC sandbox placeholder':new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(n)):'Not available'}
 function findNumber(obj:any,keys:string[]):number|null{if(!obj||typeof obj!=='object')return null;for(const k of keys){if(typeof obj[k]==='number')return obj[k]}for(const v of Object.values(obj)){const n=findNumber(v,keys);if(n!==null)return n}return null}
 function collectMessages(obj:any,out:string[]=[]){if(!obj||typeof obj!=='object')return out;if(Array.isArray(obj)){for(const v of obj)collectMessages(v,out);return out}for(const [k,v] of Object.entries(obj)){if((k.toLowerCase().includes('message')||k.toLowerCase().includes('warning'))&&typeof v==='string')out.push(v);else if(typeof v==='object')collectMessages(v,out)}return Array.from(new Set(out))}
 function taxYearEnded(taxYear:string){const start=Number(taxYear.slice(0,4));return Number.isFinite(start)&&new Date()>=new Date(Date.UTC(start+1,3,6))}
