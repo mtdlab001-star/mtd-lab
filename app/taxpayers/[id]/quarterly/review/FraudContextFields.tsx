@@ -16,6 +16,8 @@ function getDeviceId(){
   if(!value){ value=crypto.randomUUID(); localStorage.setItem(key,value) }
   return value
 }
+function publicPort(){return window.location.protocol==='http:'?'80':'443'}
+function multiFactor(){return `type=OTHER&timestamp=${new Date().toISOString()}`}
 
 export default function FraudContextFields(){
   const [ready,setReady]=useState(false)
@@ -29,6 +31,8 @@ export default function FraudContextFields(){
       screens:screenInfo,
       timezone:timezone(),
       windowSize,
+      clientPublicPort:publicPort(),
+      multiFactor:multiFactor(),
       doNotTrack:navigator.doNotTrack||''
     })
     setReady(true)
