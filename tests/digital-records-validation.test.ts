@@ -1,0 +1,8 @@
+import test from 'node:test'
+import assert from 'node:assert/strict'
+import { parseCsv,taxYearForDate,validateCsvRows } from '../lib/digital-records-validation.ts'
+
+test('tax years start on 6 April',()=>{assert.equal(taxYearForDate('2026-04-05'),'2025-26');assert.equal(taxYearForDate('2026-04-06'),'2026-27');assert.equal(taxYearForDate('2026-02-31'),null)})
+test('quoted CSV values are preserved',()=>{const parsed=parseCsv('business_id,date,type,category,amount,description\nXPIS1,2026-04-06,income,Rent,12.50,"Flat 1, London"');assert.equal(parsed.rows[1][5],'Flat 1, London')})
+test('reports exact invalid and duplicate row numbers',()=>{const text='business_id,date,type,category,amount\nXPIS1,2026-04-06,income,Rent,100\nXPIS1,2026-04-06,income,Rent,100\nXFIS1,not-a-date,expense,,x';const result=validateCsvRows({text,taxpayerId:'t1',selectedBusinessId:'',requestedSourceType:'',sources:[{businessId:'XPIS1',sourceType:'uk-property'},{businessId:'XFIS1',sourceType:'foreign-property'}]});assert.equal(result.inserts.length,1);assert.deepEqual(result.issues.map(x=>x.row),[3,4]);assert.match(result.issues[0].message,/duplicate/);assert.match(result.issues[1].message,/date/);assert.match(result.issues[1].message,/category/)})
+test('rejects cross-lane fallback IDs',()=>{const result=validateCsvRows({text:'business_id,date,type,category,amount\nXFIS1,2026-04-06,income,Rent,100',taxpayerId:'t1',selectedBusinessId:'',requestedSourceType:'uk-property',sources:[{businessId:'XFIS1',sourceType:'foreign-property'}]});assert.equal(result.inserts.length,0);assert.match(result.issues[0].message,/different income-source lane/)})
