@@ -22,7 +22,7 @@ export function buildUkPropertyCumulativePayload(p:any){
 }
 
 export function buildForeignPropertyCumulativePayload(p:any){
-  return {fromDate:p.periodStart,toDate:p.periodEnd,foreignProperty:{income:{periodAmount:n(p.rents),premiumsOfLeaseGrant:n(p.leasePremiums),otherIncome:n(p.otherIncome)},expenses:{other:n(p.propertyExpenses)}}}
+  return {fromDate:p.periodStart,toDate:p.periodEnd,foreignNonFhlProperty:[{countryCode:String(p.countryCode||'FRA').toUpperCase(),income:{rentIncome:{rentAmount:n(p.rents)},foreignTaxCreditRelief:false,premiumsOfLeaseGrant:n(p.leasePremiums),otherPropertyIncome:n(p.otherIncome)},expenses:{consolidatedExpenses:n(p.propertyExpenses)}}]}
 }
 
 export function cumulativeEndpoint(nino:string,businessId:string,taxYear:string){return `/individuals/business/self-employment/${encodeURIComponent(nino)}/${encodeURIComponent(businessId)}/cumulative/${encodeURIComponent(taxYear)}`}
