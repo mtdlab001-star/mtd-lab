@@ -358,3 +358,28 @@
   }
   .help{
     grid-template-columns:48px 1fr;
+    gap:14px;
+    padding:16px;
+  }
+  .helpIcon{
+    width:42px;
+    height:42px;
+  }
+  .benefits{
+    grid-template-columns:1fr;
+    gap:16px;
+    width:min(360px,100%);
+  }
+  .benefit{
+    border-right:0;
+    border-bottom:1px solid rgba(57,74,116,.72);
+    padding:0 0 16px;
+    text-align:center;
+  }
+  .benefit:last-child{
+    border-bottom:0;
+  }
+  .benefit span{
+    margin:0 auto;
+  }
+}
