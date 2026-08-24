@@ -3,7 +3,8 @@
 import Link from 'next/link'
 import { useEffect, useMemo, useState } from 'react'
 
-type Props = { taxpayerId: string; active?: string }
+type SourceType = 'self-employment' | 'uk-property' | 'foreign-property'
+type Props = { taxpayerId: string; active?: string; sourceTypes?: SourceType[] }
 type GroupKey = 'access' | 'hmrc' | 'mtd-income-tax' | 'income-sources' | 'mtd-filing'
 type OpenGroups = Record<GroupKey, boolean>
 
@@ -23,8 +24,9 @@ function activeGroupFor(active?: string): GroupKey | null {
   return null
 }
 
-export default function TaxpayerSidebar({ taxpayerId, active }: Props) {
+export default function TaxpayerSidebar({ taxpayerId, active, sourceTypes }: Props) {
   const id = encodeURIComponent(taxpayerId)
+  const visibleSourceTypes = sourceTypes?.length ? sourceTypes : ['self-employment', 'uk-property', 'foreign-property'] as SourceType[]
   const activeGroup = useMemo(() => activeGroupFor(active), [active])
   const storageKey = `mtd-lab:sidebar:${taxpayerId}`
   const [hydrated, setHydrated] = useState(false)
@@ -82,9 +84,9 @@ export default function TaxpayerSidebar({ taxpayerId, active }: Props) {
       {group('mtd-income-tax', 'MTD Income Tax', item('digital-records', 'Digital Records', `/taxpayers/${id}/digital-records`))}
       {group('income-sources', 'Income Sources', <>
         {item('businesses', 'All Businesses', `/taxpayers/${id}/businesses`)}
-        {item('self-employment', 'Self Employment', `/taxpayers/${id}/businesses?type=self-employment`)}
-        {item('foreign-property', 'Foreign Property', `/taxpayers/${id}/businesses?type=foreign-property`)}
-        {item('property', 'UK Property', `/taxpayers/${id}/businesses?type=uk-property`)}
+        {visibleSourceTypes.includes('self-employment') && item('self-employment', 'Self Employment', `/taxpayers/${id}/businesses?type=self-employment`)}
+        {visibleSourceTypes.includes('uk-property') && item('property', 'UK Property', `/taxpayers/${id}/businesses?type=uk-property`)}
+        {visibleSourceTypes.includes('foreign-property') && item('foreign-property', 'Foreign Property', `/taxpayers/${id}/businesses?type=foreign-property`)}
       </>)}
       {group('mtd-filing', 'MTD Filing', <>
         {item('submissions', 'Submission Centre', `/taxpayers/${id}/submissions`)}
