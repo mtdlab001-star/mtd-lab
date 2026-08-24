@@ -21,8 +21,10 @@ export function buildUkPropertyCumulativePayload(p:any){
   return {fromDate:p.periodStart,toDate:p.periodEnd,ukProperty:{income:{premiumsOfLeaseGrant:n(p.leasePremiums),reversePremiums:n(p.reversePremiums),periodAmount:n(p.rentalIncome??p.rents),taxDeducted:n(p.ukTaxDeducted),otherIncome:n(p.otherPropertyIncome??p.otherIncome),rentARoom:{rentsReceived:n(p.rentARoomReceived)}},expenses:{premisesRunningCosts:n(p.premisesRunningCosts??p.premisesCosts),repairsAndMaintenance:n(p.repairsMaintenance),financialCosts:n(p.financialCosts),professionalFees:n(p.professionalFees),costOfServices:n(p.costOfServices),other:n(p.otherCosts??p.otherExpenses),residentialFinancialCost:n(p.residentialFinancialCost),travelCosts:n(p.travelCosts),residentialFinancialCostsCarriedForward:n(p.carryForwardResidentialFinanceCost),rentARoom:{amountClaimed:n(p.rentARoomRelief)}}}}
 }
 
-export function buildForeignPropertyCumulativePayload(p:any){
-  return {fromDate:p.periodStart,toDate:p.periodEnd,foreignProperty:{foreignNonFhlProperty:[{countryCode:String(p.countryCode||'FRA').toUpperCase(),income:{rentIncome:{rentAmount:n(p.rents)},foreignTaxCreditRelief:false,premiumsOfLeaseGrant:n(p.leasePremiums),otherPropertyIncome:n(p.otherIncome)},expenses:{consolidatedExpenses:n(p.propertyExpenses)}}]}}
+export function buildForeignPropertyCumulativePayload(p:any,taxYear?:string){
+  const startYear=Number(String(taxYear||'').slice(0,4))
+  const identifier=startYear>=2026?{propertyId:String(p.propertyId||'')}:{countryCode:String(p.countryCode||'FRA').toUpperCase()}
+  return {fromDate:p.periodStart,toDate:p.periodEnd,foreignProperty:[{...identifier,income:{rentIncome:{rentAmount:n(p.rents)},foreignTaxCreditRelief:false,premiumsOfLeaseGrant:n(p.leasePremiums),otherPropertyIncome:n(p.otherIncome)},expenses:{consolidatedExpenses:n(p.propertyExpenses)}}]}
 }
 
 export function cumulativeEndpoint(nino:string,businessId:string,taxYear:string){return `/individuals/business/self-employment/${encodeURIComponent(nino)}/${encodeURIComponent(businessId)}/cumulative/${encodeURIComponent(taxYear)}`}
