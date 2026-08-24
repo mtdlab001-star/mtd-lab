@@ -11,6 +11,7 @@ test('foreign property payload uses HMRC non FHL country structure',()=>{
     otherIncome:0,
     propertyExpenses:1540
   })
+  assert.equal('foreignProperty' in payload,true)
   assert.equal(payload.fromDate,'2026-04-06')
   assert.equal(payload.toDate,'2026-10-05')
   assert.deepEqual(payload.foreignProperty.foreignNonFhlProperty,[{
