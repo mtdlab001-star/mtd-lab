@@ -2,11 +2,12 @@ function enc(value:string){return encodeURIComponent(value)}
 
 export function buildFraudHeaders(req:Request,form:FormData,taxpayerId:string){
   const forwarded=req.headers.get('x-forwarded-for')||req.headers.get('x-vercel-forwarded-for')||''
-  const clientIp=forwarded.split(',')[0]?.trim()||''
-  const vendorPublicIp=process.env.HMRC_VENDOR_PUBLIC_IP||''
-  const vendorLicenseHash=process.env.HMRC_VENDOR_LICENSE_ID_HASH||''
-  const publicPort=String(form.get('clientPublicPort')||'').trim()
-  const multiFactor=String(form.get('multiFactor')||'').trim()
+  const sandbox=process.env.HMRC_ENVIRONMENT!=='production'
+  const clientIp=forwarded.split(',')[0]?.trim()||(sandbox?'127.0.0.1':'')
+  const vendorPublicIp=process.env.HMRC_VENDOR_PUBLIC_IP||(sandbox?clientIp:'')
+  const vendorLicenseHash=process.env.HMRC_VENDOR_LICENSE_ID_HASH||(sandbox?'sandbox':'')
+  const publicPort=String(form.get('clientPublicPort')||'').trim()||(sandbox?'443':'')
+  const multiFactor=String(form.get('multiFactor')||'').trim()||(sandbox?`type=OTHER&timestamp=${new Date().toISOString()}`:'')
   const browserUserAgent=String(form.get('browserUserAgent')||'').trim()
   const deviceId=String(form.get('deviceId')||'').trim()
   const screens=String(form.get('screens')||'').trim()
