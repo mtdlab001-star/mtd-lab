@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
-import { incomeSourceLabel, incomeSourceType, isPropertyIncomeSource } from '@/lib/mtd-income-source'
+import { incomeSourceLabel, incomeSourceType } from '@/lib/mtd-income-source'
 
 export const dynamic='force-dynamic'
 
