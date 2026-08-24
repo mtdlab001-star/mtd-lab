@@ -71,7 +71,7 @@ export default function TaxpayerSidebar({ taxpayerId, active, sourceTypes }: Pro
   )
 
   return <aside className="side">
-    <div className="brand"><img className="brandLogo" src="/mtd-lab-logo.svg" alt="MTD Lab, Making Tax Digital for Income Tax"/></div>
+    <div className="brand"><img className="brandLogo" src="/mtd-lab-logo-exact.webp" alt="MTD Lab, Making Tax Digital for Income Tax"/></div>
     <nav className="nav" aria-label="Taxpayer navigation">
       {item('dashboard', 'Dashboard', '/')}
       {item('taxpayers', 'Taxpayers', '/taxpayers')}
