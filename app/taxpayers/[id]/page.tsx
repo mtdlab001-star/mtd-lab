@@ -2,7 +2,7 @@ import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import { assessHmrcConnection } from '@/lib/hmrc-connection-status'
-import { incomeSourceLabel, incomeSourceType } from '@/lib/mtd-income-source'
+import { incomeSourceType } from '@/lib/mtd-income-source'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,7 +10,6 @@ function fmtDate(value?: string | null) { if (!value) return 'Not available'; co
 function taxYearFor(value?: string | null) { if (!value) return null; const [y,m,d] = value.split('-').map(Number); if (!y || !m || !d) return null; const start = m > 4 || (m === 4 && d >= 6) ? y : y - 1; return `${start}/${String(start + 1).slice(-2)}` }
 function acceptedSubmissionFor(submissions:any[],obligation:any){return submissions.find((s:any)=>s.status==='submitted'&&s.period_end===obligation.period_end&&(!obligation.business_id||s.business_id===obligation.business_id))}
 function obligationStatus(obligation:any,submission?:any){const hmrc=String(obligation.status||'').toLowerCase();if(hmrc==='fulfilled')return {label:'Fulfilled',cls:'statusDone'};if(submission?.status==='submitted'){const submittedAt=new Date(submission.submitted_at||submission.created_at||0);const age=Date.now()-submittedAt.getTime();if(Number.isFinite(age)&&age>=0&&age<1000*60*15)return {label:'Accepted, awaiting HMRC update',cls:'statusDone'};return {label:'Accepted, obligation still open',cls:'statusOpen'}}return {label:obligation.status||'Open',cls:'statusOpen'}}
-function obligationIncomeSourceLabel(businessId?:string|null){const id=String(businessId||'').toUpperCase();if(id.startsWith('XFIS'))return 'Foreign Property';if(id.startsWith('XPIS'))return 'UK Property';if(id.startsWith('XAIS'))return 'Self Employment';return null}
 function obligationIncomeSourceType(businessId?:string|null){const id=String(businessId||'').toUpperCase();if(id.startsWith('XFIS'))return 'foreign-property';if(id.startsWith('XPIS'))return 'uk-property';return 'self-employment'}
 
 export default async function TaxpayerPage({ params, searchParams }: { params: Promise<{id:string}>, searchParams: Promise<Record<string,string|undefined>> }) {
