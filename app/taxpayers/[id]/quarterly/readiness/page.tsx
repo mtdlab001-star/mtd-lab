@@ -38,8 +38,8 @@ export default async function ReadinessPage({params,searchParams}:{params:Promis
   }catch{}
   const sandbox=process.env.HMRC_ENVIRONMENT!=='production'
   const productionUnlocked=process.env.HMRC_ALLOW_PRODUCTION_SUBMISSIONS==='true'
-  const vendorIp=!!process.env.HMRC_VENDOR_PUBLIC_IP
-  const vendorLicense=!!process.env.HMRC_VENDOR_LICENSE_ID_HASH
+  const vendorIp=sandbox||!!process.env.HMRC_VENDOR_PUBLIC_IP
+  const vendorLicense=sandbox||!!process.env.HMRC_VENDOR_LICENSE_ID_HASH
   const appVersion=process.env.NEXT_PUBLIC_APP_VERSION||'0.3.0'
   const oauthScope=String(connection?.scope||'')
   const connectionStatus=assessHmrcConnection(connection)
