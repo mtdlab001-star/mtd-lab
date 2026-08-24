@@ -22,6 +22,7 @@ export default async function Page({params,searchParams}:{params:Promise<{id:str
  try{sources=await listMtdIncomeSources(db,id)}catch{sources=[]}
  const canonicalRequestedType=q.sourceType==='property'?'uk-property':q.sourceType
  const requestedType=(['self-employment','uk-property','foreign-property'].includes(String(canonicalRequestedType))?canonicalRequestedType:'self-employment') as MtdIncomeSourceType
+ const availableTypes=(['self-employment','uk-property','foreign-property'] as MtdIncomeSourceType[]).filter(sourceType=>sources.some(source=>source.sourceType===sourceType))
  const requestedSource=sources.find(source=>source.businessId===q.businessId)
  const selectedType=requestedSource?.sourceType||(sources.some(source=>source.sourceType===requestedType)?requestedType:sources[0]?.sourceType||requestedType)
  const laneSources=sources.filter(source=>source.sourceType===selectedType)
@@ -37,9 +38,9 @@ export default async function Page({params,searchParams}:{params:Promise<{id:str
  const expenses=rows.filter((r:any)=>r.record_type==='expense').reduce((sum:number,row:any)=>sum+Number(row.amount||0),0)
  const meta=laneMeta[selectedType]
  const sourceQuery=selectedSource?`sourceType=${encodeURIComponent(selectedType)}&businessId=${encodeURIComponent(selectedSource.businessId)}`:`sourceType=${encodeURIComponent(selectedType)}`
- return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="digital-records"/><main className="main">
+ return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="digital-records" sourceTypes={availableTypes}/><main className="main">
   <div className="top"><div><h1 className="pageTitle">Digital Records</h1><p className="muted">Keep separate digital records for each MTD Income Tax income source.</p></div><a className="btn btnSmall" href={`/api/digital-records/template?${sourceQuery}`}>Download {meta.label} CSV template</a></div>
-  <div className="cards">{(['self-employment','uk-property','foreign-property'] as MtdIncomeSourceType[]).map(laneType=>{const lane=laneMeta[laneType];const laneItems=sources.filter(source=>source.sourceType===laneType);return <div className="card" key={laneType}><span className="eyebrow">{lane.label}</span><strong className="dateValue">{lane.subtitle}</strong><p className="muted">{lane.description}</p>{laneItems.length?<Link className="btn btnSmall" href={`/taxpayers/${id}/digital-records?sourceType=${laneType}&businessId=${encodeURIComponent(laneItems[0].businessId)}`}>Open records</Link>:<span className="muted">No HMRC income source available</span>}</div>})}</div>
+  <div className="cards">{availableTypes.length?availableTypes.map(laneType=>{const lane=laneMeta[laneType];const laneItems=sources.filter(source=>source.sourceType===laneType);return <div className="card" key={laneType}><span className="eyebrow">{lane.label}</span><strong className="dateValue">{lane.subtitle}</strong><p className="muted">{lane.description}</p><Link className="btn btnSmall" href={`/taxpayers/${id}/digital-records?sourceType=${laneType}&businessId=${encodeURIComponent(laneItems[0].businessId)}`}>Open records</Link></div>}):<div className="card"><span className="eyebrow">Income sources</span><strong>No HMRC source available</strong><p className="muted">Synchronise HMRC before adding digital records.</p></div>}</div>
   {q.saved&&<div className="status"><strong>Digital record saved.</strong></div>}
   {q.deleted&&<div className="status"><strong>Digital record corrected.</strong><div className="muted">The removed record will no longer be included in cumulative quarterly totals.</div></div>}
   {q.evidenceUploaded&&<div className="status"><strong>Supporting document uploaded securely.</strong></div>}
