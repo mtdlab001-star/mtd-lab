@@ -26,7 +26,7 @@ function activeGroupFor(active?: string): GroupKey | null {
 
 export default function TaxpayerSidebar({ taxpayerId, active, sourceTypes }: Props) {
   const id = encodeURIComponent(taxpayerId)
-  const visibleSourceTypes = sourceTypes?.length ? sourceTypes : ['self-employment', 'uk-property', 'foreign-property'] as SourceType[]
+  const visibleSourceTypes = sourceTypes || []
   const activeGroup = useMemo(() => activeGroupFor(active), [active])
   const storageKey = `mtd-lab:sidebar:${taxpayerId}`
   const [hydrated, setHydrated] = useState(false)
