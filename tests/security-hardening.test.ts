@@ -43,7 +43,8 @@ test('evidence uploads verify actual file signatures',()=>{
 test('OAuth state validation rejects malformed state before timing safe comparison',()=>{
   const source=readFileSync('lib/oauth-state.ts','utf8')
   assert.match(source,/timingSafeEqual/)
-  assert.match(source,/supplied\.length!==expected\.length/)
+  assert.match(source,/actualBuffer\.length !== expectedBuffer\.length/)
+  assert.match(source,/value\.length > 4096/)
 })
 
 test('Next.js does not expose the powered-by header',()=>{
