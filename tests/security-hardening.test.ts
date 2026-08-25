@@ -31,7 +31,7 @@ test('security headers deny framing, active objects and insecure transport',()=>
 test('middleware only exempts explicitly known public assets',()=>{
   const middleware=readFileSync('middleware.ts','utf8')
   assert.match(middleware,/const publicAssets=new Set/)
-  assert.doesNotMatch(middleware,/\\\.\(\?:png\|jpe\?g\|webp\|svg\|ico\)/)
+  assert.ok(!middleware.includes('const publicAsset=/'),'Middleware must not exempt arbitrary image-extension paths')
   assert.match(middleware,/publicAssets\.has\(path\)/)
 })
 
