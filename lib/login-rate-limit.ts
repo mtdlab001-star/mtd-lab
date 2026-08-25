@@ -53,7 +53,7 @@ async function countFailedAttempts(ipHash: string, usernameHash: string) {
   const db = supabaseAdmin()
   const [ipAttempts, usernameAttempts] = await Promise.all([
     db.from('app_login_attempts').select('id', { count: 'exact', head: true }).eq('success', false).eq('ip_hash', ipHash).gte('created_at', since),
-    db.from('app_login_attempts').select('id', { count: 'exact', head: true }).eq('username_hash', usernameHash).gte('created_at', since),
+    db.from('app_login_attempts').select('id', { count: 'exact', head: true }).eq('success', false).eq('username_hash', usernameHash).gte('created_at', since),
   ])
 
   if (ipAttempts.error) throw ipAttempts.error
