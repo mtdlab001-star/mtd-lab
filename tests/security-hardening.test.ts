@@ -28,6 +28,13 @@ test('security headers deny framing, active objects and insecure transport',()=>
   assert.doesNotMatch(middleware,/unsafe-eval/)
 })
 
+test('middleware only exempts explicitly known public assets',()=>{
+  const middleware=readFileSync('middleware.ts','utf8')
+  assert.match(middleware,/const publicAssets=new Set/)
+  assert.doesNotMatch(middleware,/\\\.\(\?:png\|jpe\?g\|webp\|svg\|ico\)/)
+  assert.match(middleware,/publicAssets\.has\(path\)/)
+})
+
 test('login rate limiting fails closed when its protection is unavailable',()=>{
   const source=readFileSync('lib/login-rate-limit.ts','utf8')
   assert.match(source,/if \(!rateLimitSecret\(\)\) \{\s*return \{ ipHash: '', usernameHash: '', limited: true,/s)
