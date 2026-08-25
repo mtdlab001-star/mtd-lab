@@ -3,11 +3,15 @@ import type { NextRequest } from 'next/server'
 import { verifyAppSession } from './lib/app-auth'
 
 const securityHeaders=[
-  ['Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"],
+  ['Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'; object-src 'none'; upgrade-insecure-requests"],
+  ['Strict-Transport-Security','max-age=31536000; includeSubDomains; preload'],
   ['X-Frame-Options','DENY'],
   ['X-Content-Type-Options','nosniff'],
   ['Referrer-Policy','strict-origin-when-cross-origin'],
   ['Permissions-Policy','camera=(), microphone=(), geolocation=(), payment=(), usb=()'],
+  ['Cross-Origin-Opener-Policy','same-origin'],
+  ['Cross-Origin-Resource-Policy','same-origin'],
+  ['X-Permitted-Cross-Domain-Policies','none'],
 ] as const
 
 function secure(res:NextResponse){
