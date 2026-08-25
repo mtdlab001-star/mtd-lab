@@ -23,3 +23,8 @@ test('security headers deny framing and do not allow eval',()=>{
   assert.match(middleware,/X-Frame-Options','DENY'/)
   assert.doesNotMatch(middleware,/unsafe-eval/)
 })
+
+test('Next.js does not expose the powered-by header',()=>{
+  const config=readFileSync('next.config.mjs','utf8')
+  assert.match(config,/poweredByHeader:\s*false/)
+})
