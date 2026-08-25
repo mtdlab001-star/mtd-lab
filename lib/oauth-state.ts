@@ -13,11 +13,23 @@ export function signState(taxpayerId: string) {
 export function verifyState(value: string) {
   const secret = process.env.HMRC_STATE_SECRET
   if (!secret) throw new Error('HMRC_STATE_SECRET is missing')
-  const [payload, sig] = value.split('.')
+  if (value.length > 4096) throw new Error('Invalid OAuth state')
+  const parts = value.split('.')
+  if (parts.length !== 2) throw new Error('Invalid OAuth state')
+  const [payload, sig] = parts
   if (!payload || !sig) throw new Error('Invalid OAuth state')
   const expected = crypto.createHmac('sha256', secret).update(payload).digest('base64url')
-  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) throw new Error('Invalid OAuth state')
-  const parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8')) as { taxpayerId: string; ts: number }
-  if (!parsed.taxpayerId || Date.now() - parsed.ts > ttlMs) throw new Error('Expired OAuth state')
-  return parsed
+  const actualBuffer = Buffer.from(sig)
+  const expectedBuffer = Buffer.from(expected)
+  if (actualBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(actualBuffer, expectedBuffer)) throw new Error('Invalid OAuth state')
+  let parsed: { taxpayerId?: string; ts?: number }
+  try {
+    parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
+  } catch {
+    throw new Error('Invalid OAuth state')
+  }
+  if (!parsed.taxpayerId || typeof parsed.ts !== 'number' || !Number.isFinite(parsed.ts)) throw new Error('Invalid OAuth state')
+  const age = Date.now() - parsed.ts
+  if (age < -60_000 || age > ttlMs) throw new Error('Expired OAuth state')
+  return { taxpayerId: parsed.taxpayerId, ts: parsed.ts }
 }
