@@ -19,7 +19,7 @@ async function handle(req:Request,source:URLSearchParams|FormData){
   const correlationId=res.headers.get('x-correlationid')||res.headers.get('x-correlation-id')||''
   const {error:auditError}=await db.from('mtd_submission_audit').insert({taxpayer_id:taxpayerId,tax_year:taxYear,event_type:'tax_calculation_retrieval',status:res.ok?'accepted':'rejected',calculation_id:calculationId,hmrc_correlation_id:correlationId||null,hmrc_status:res.status,response_summary:payload,created_at:new Date().toISOString()});if(auditError)console.error('Calculation retrieval audit failed',auditError.message)
   if(!res.ok){back.searchParams.set('error',res.status===404?'HMRC calculation is not ready yet. Wait a few seconds and retrieve again.':(payload?.message||payload?.code||`HMRC ${res.status}`));if(correlationId)back.searchParams.set('correlationId',correlationId);return NextResponse.redirect(back,303)}
-  back.searchParams.set('result',Buffer.from(JSON.stringify(payload)).toString('base64url'));back.searchParams.set('retrieved','1');if(correlationId)back.searchParams.set('correlationId',correlationId);return NextResponse.redirect(back,303)
+  back.searchParams.set('retrieved','1');if(correlationId)back.searchParams.set('correlationId',correlationId);return NextResponse.redirect(back,303)
  }catch(e:any){back.searchParams.set('error',e.message||'Could not retrieve HMRC tax calculation');return NextResponse.redirect(back,303)}
 }
 

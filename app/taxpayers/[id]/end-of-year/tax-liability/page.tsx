@@ -2,16 +2,16 @@ import Link from 'next/link'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import FraudContextFields from '@/app/components/FraudContextFields'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { latestHmrcResponse } from '@/lib/hmrc-response-audit'
 
 export const dynamic='force-dynamic'
-function decode(value?:string){try{return value?JSON.parse(Buffer.from(value,'base64url').toString('utf8')):null}catch{return null}}
 function gbp(v:any){return new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(Number(v||0))}
 function ended(taxYear:string){const y=Number(taxYear.slice(0,4));return new Date()>new Date(`${y+1}-04-05T23:59:59Z`)}
 const money=(name:string,label:string)=><label>{label}<input className="inputField" name={name} inputMode="decimal" placeholder="0.00"/></label>
 
 export default async function TaxLiabilityPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
  const {id}=await params;const qs=await searchParams;const db=supabaseAdmin();const {data:obligations}=await db.from('hmrc_obligations').select('period_start').eq('taxpayer_id',id).gte('period_start','2025-04-06')
- const years=Array.from(new Set((obligations||[]).map((o:any)=>{const y=Number(String(o.period_start).slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse();const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27');const result:any=decode(qs.result);const yearEnded=ended(selected)
+ const years=Array.from(new Set((obligations||[]).map((o:any)=>{const y=Number(String(o.period_start).slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse();const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27');const stored=await latestHmrcResponse(db,{taxpayerId:id,taxYear:selected,eventType:'tax_liability_retrieval'});const result:any=stored?.response_summary||stored?.response_payload||null;const yearEnded=ended(selected)
  return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="tax-liability"/><main className="main">
   <div className="top"><div><h1 className="pageTitle">Tax Liability Adjustments</h1><p className="muted">Retrieve, create or amend HMRC tax liability adjustments before final declaration.</p></div><span className="badge">{selected}</span></div>
   {qs.error&&<div className="status statusError"><strong>HMRC needs attention.</strong><div>{qs.error}</div>{qs.correlationId&&<div className="muted">Correlation ID: {qs.correlationId}</div>}</div>}

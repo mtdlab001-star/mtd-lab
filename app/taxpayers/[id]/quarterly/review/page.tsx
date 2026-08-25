@@ -3,10 +3,10 @@ import FraudContextFields from './FraudContextFields'
 import { verifyReviewPayload } from '@/lib/review-token'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { normaliseHmrcErrors } from '@/lib/hmrc-errors'
 
 function gbp(n:number){return new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(n||0)}
 function fmtDate(value?:string){if(!value)return 'Not available';const d=new Date(`${value}T00:00:00`);return Number.isNaN(d.getTime())?value:d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
-function decodeErrors(value?:string){try{return value?JSON.parse(Buffer.from(value,'base64url').toString('utf8')):[]}catch{return []}}
 
 const selfRows=[['turnover','Turnover'],['otherIncome','Other income'],['taxTakenOff','Tax taken off trading income'],['costOfGoods','Cost of goods sold'],['cisPayments','CIS payments to subcontractors'],['staffCosts','Wages and staff costs'],['travelCosts','Car, van and travel expenses'],['premisesCosts','Premises running costs'],['repairsMaintenance','Repairs and maintenance'],['officeCosts','Office costs'],['advertisingCosts','Advertising costs'],['businessEntertainment','Business entertainment'],['interestLoans','Interest on loans'],['financialCharges','Financial charges'],['badDebts','Irrecoverable debts'],['professionalFees','Professional fees'],['depreciation','Depreciation'],['otherExpenses','Other expenses']]
 const ukPropertyRows=[['rents','Total rent'],['leasePremiums','Premiums for grant of a lease'],['reversePremiums','Reverse premiums and inducements'],['otherIncome','Other property income'],['ukTaxDeducted','UK tax deducted'],['rentARoomReceived','Rent a Room received'],['premisesCosts','Rent, rates, insurance and ground rents'],['repairsMaintenance','Property repairs and maintenance'],['financialCosts','Property finance costs'],['professionalFees','Legal, management and professional fees'],['costOfServices','Costs of services provided'],['travelCosts','Travel expenses'],['otherExpenses','Other allowable property expenses'],['rentARoomRelief','Rent a Room relief'],['residentialFinancialCost','Residential financial cost'],['carryForwardResidentialFinanceCost','Residential finance cost carried forward']]
@@ -15,7 +15,11 @@ const foreignPropertyRows=[['rents','Total rents and other receipts'],['leasePre
 export default async function ReviewPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
  const {id}=await params;const qs=await searchParams;const token=String(qs.data||'');const p:any=verifyReviewPayload(token)
  if(!p||p.taxpayerId!==id)return <main className="main"><h1>Quarterly update</h1><p>Review data is missing, invalid or has been altered.</p><Link className="btn" href={`/taxpayers/${id}/submissions`}>Return to Submission Centre</Link></main>
- const {data:agentRows}=await supabaseAdmin().from('mtd_agent_authorisations').select('agent_id,expires_at,mtd_agents(agent_name,organisation_name,hmrc_arn,status)').eq('taxpayer_id',id).eq('status','authorised').eq('can_submit_quarterly',true)
+ const db=supabaseAdmin()
+ const [{data:agentRows},{data:submissionRow}]=await Promise.all([
+  db.from('mtd_agent_authorisations').select('agent_id,expires_at,mtd_agents(agent_name,organisation_name,hmrc_arn,status)').eq('taxpayer_id',id).eq('status','authorised').eq('can_submit_quarterly',true),
+  qs.submissionId?db.from('hmrc_quarterly_submissions').select('id,status,response_payload,error_message,hmrc_correlation_id').eq('id',qs.submissionId).eq('taxpayer_id',id).maybeSingle():Promise.resolve({data:null} as any)
+ ])
  const agents=(agentRows||[]).filter((r:any)=>(!r.expires_at||new Date(r.expires_at).getTime()>Date.now())&&(!r.mtd_agents?.status||r.mtd_agents.status==='active'))
  const sourceType=String(p.incomeSourceType||p.filingType||'self-employment')
  const foreign=sourceType==='foreign-property';const ukProperty=sourceType==='uk-property'||(!p.incomeSourceType&&p.filingType==='property');const property=foreign||ukProperty
@@ -25,7 +29,7 @@ export default async function ReviewPage({params,searchParams}:{params:Promise<{
  const incomeKeys=foreign?['rents','leasePremiums','otherIncome']:ukProperty?['rents','leasePremiums','reversePremiums','otherIncome','rentARoomReceived']:['turnover','otherIncome']
  const expenseKeys=foreign?['propertyExpenses']:ukProperty?['premisesCosts','repairsMaintenance','financialCosts','professionalFees','costOfServices','travelCosts','otherExpenses','rentARoomRelief','residentialFinancialCost','carryForwardResidentialFinanceCost']:['costOfGoods','cisPayments','staffCosts','travelCosts','premisesCosts','repairsMaintenance','officeCosts','advertisingCosts','businessEntertainment','interestLoans','financialCharges','badDebts','professionalFees','depreciation','otherExpenses']
  const grossIncome=incomeKeys.reduce((s,k)=>s+Number(p[k]||0),0);const income=ukProperty?grossIncome-Number(p.ukTaxDeducted||0):grossIncome;const expenses=expenseKeys.reduce((s,k)=>s+Number(p[k]||0),0);const missing=String(qs.missing||'').split(',').filter(Boolean)
- const hmrcErrors:any[]=decodeErrors(qs.hmrcErrors)
+ const hmrcErrors:any[]=submissionRow?.response_payload?normaliseHmrcErrors(submissionRow.response_payload):[]
  const editData={...p};delete editData.preparedAt
  const imported=Buffer.from(JSON.stringify(editData),'utf8').toString('base64url')
  const editHref=`/taxpayers/${id}/submissions?type=${encodeURIComponent(sourceType)}&imported=${encodeURIComponent(imported)}&businessId=${encodeURIComponent(p.businessId||'')}&periodStart=${encodeURIComponent(p.periodStart||'')}&periodEnd=${encodeURIComponent(p.periodEnd||'')}`

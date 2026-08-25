@@ -2,17 +2,17 @@ import Link from 'next/link'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import FraudContextFields from '@/app/components/FraudContextFields'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { latestHmrcResponse } from '@/lib/hmrc-response-audit'
 
 export const dynamic='force-dynamic'
 function isProperty(b:any){const t=String(b.business_type||'').toLowerCase();const r=JSON.stringify(b.raw||{}).toLowerCase();return t.includes('property')||r.includes('uk-property')||r.includes('property')}
-function decode(value?:string){try{return value?JSON.parse(Buffer.from(value,'base64url').toString('utf8')):null}catch{return null}}
 function gbp(v:any){return new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(Number(v||0))}
 const money=(name:string,label:string)=><label>{label}<input className="inputField" name={name} inputMode="decimal" placeholder="0.00"/></label>
 const detailed=[['costOfGoods','Cost of goods'],['paymentsToSubcontractors','Payments to subcontractors'],['wagesAndStaffCosts','Wages and staff costs'],['carVanTravelExpenses','Car, van and travel'],['premisesRunningCosts','Premises running costs'],['maintenanceCosts','Repairs and maintenance'],['adminCosts','Admin and office costs'],['interestOnBankOtherLoans','Interest on bank and other loans'],['financeCharges','Finance charges'],['irrecoverableDebts','Irrecoverable debts'],['professionalFees','Professional fees'],['depreciation','Depreciation'],['otherExpenses','Other expenses'],['advertisingCosts','Advertising costs'],['businessEntertainmentCosts','Business entertainment']]
 
 export default async function AdjustmentsPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
  const {id}=await params;const qs=await searchParams;const db=supabaseAdmin();const [{data:taxpayer},{data:businesses},{data:obligations}]=await Promise.all([db.from('taxpayers').select('display_name,nino').eq('id',id).maybeSingle(),db.from('hmrc_businesses').select('*').eq('taxpayer_id',id).order('created_at'),db.from('hmrc_obligations').select('period_start').eq('taxpayer_id',id).gte('period_start','2025-04-06')])
- const years=Array.from(new Set((obligations||[]).map((o:any)=>{const d=String(o.period_start);const y=Number(d.slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse();const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27');const lossResult:any=decode(qs.lossResult);const bsasType=qs.businessType||'self-employment'
+ const years=Array.from(new Set((obligations||[]).map((o:any)=>{const d=String(o.period_start);const y=Number(d.slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse();const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27');const storedLoss=qs.lossBusinessId?await latestHmrcResponse(db,{taxpayerId:id,taxYear:selected,eventType:'losses_retrieval',requestKey:'businessId',requestValue:qs.lossBusinessId}):null;const lossResult:any=storedLoss?.response_summary||storedLoss?.response_payload||null;const bsasType=qs.businessType||'self-employment'
  return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="adjustments"/><main className="main">
   <div className="top"><div><h1 className="pageTitle">Annual Adjustments and Losses</h1><p className="muted">Prepare year end business adjustments and review or amend HMRC losses before intent to finalise.</p></div><span className="badge">{selected}</span></div>
   {qs.error&&<div className="status statusError"><strong>HMRC needs attention.</strong><div>{qs.error}</div>{qs.correlationId&&<div className="muted">Correlation ID: {qs.correlationId}</div>}</div>}

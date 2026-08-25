@@ -1,0 +1,24 @@
+export async function recordHmrcResponse(db:any,args:{taxpayerId:string;taxYear:string;eventType:string;status:'accepted'|'rejected';payload:any;correlationId?:string|null;hmrcStatus?:number|null;requestSummary?:Record<string,any>}){
+  const {data,error}=await db.from('mtd_submission_audit').insert({
+    taxpayer_id:args.taxpayerId,
+    tax_year:args.taxYear,
+    event_type:args.eventType,
+    status:args.status,
+    hmrc_correlation_id:args.correlationId||null,
+    hmrc_status:args.hmrcStatus||null,
+    request_summary:args.requestSummary||{},
+    response_summary:args.payload,
+    created_at:new Date().toISOString(),
+  }).select('id').maybeSingle()
+  if(error)console.error('HMRC response audit failed',error.message)
+  return data?.id?String(data.id):''
+}
+
+export async function latestHmrcResponse(db:any,args:{taxpayerId:string;taxYear:string;eventType:string;requestKey?:string;requestValue?:string}){
+  let query=db.from('mtd_submission_audit').select('id,response_summary,response_payload,hmrc_correlation_id,created_at,request_summary').eq('taxpayer_id',args.taxpayerId).eq('tax_year',args.taxYear).eq('event_type',args.eventType).eq('status','accepted').order('created_at',{ascending:false}).limit(10)
+  const {data}=await query
+  const rows=data||[]
+  const requestKey=args.requestKey
+  const row=requestKey?rows.find((r:any)=>String(r?.request_summary?.[requestKey]||'')===String(args.requestValue||'')):rows[0]
+  return row||null
+}

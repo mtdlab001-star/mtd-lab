@@ -1,13 +1,13 @@
 import Link from 'next/link'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { latestHmrcResponse } from '@/lib/hmrc-response-audit'
 
 export const dynamic='force-dynamic'
-function decode(value?:string){try{return value?JSON.parse(Buffer.from(value,'base64url').toString('utf8')):null}catch{return null}}
 
 export default async function EmploymentPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
  const {id}=await params;const qs=await searchParams;const db=supabaseAdmin();const {data:obligations}=await db.from('hmrc_obligations').select('period_start').eq('taxpayer_id',id).gte('period_start','2025-04-06')
- const years=Array.from(new Set((obligations||[]).map((o:any)=>{const d=String(o.period_start);const y=Number(d.slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse();const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27');const result:any=decode(qs.result);const financial:any=decode(qs.financialResult);const employments=Array.isArray(result?.employments)?result.employments:[]
+ const years=Array.from(new Set((obligations||[]).map((o:any)=>{const d=String(o.period_start);const y=Number(d.slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse();const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27');const employmentList=await latestHmrcResponse(db,{taxpayerId:id,taxYear:selected,eventType:'employment_list_retrieval'});const financialRow=qs.employmentId?await latestHmrcResponse(db,{taxpayerId:id,taxYear:selected,eventType:'employment_financial_retrieval',requestKey:'employmentId',requestValue:qs.employmentId}):null;const result:any=employmentList?.response_summary||employmentList?.response_payload||null;const financial:any=financialRow?.response_summary||financialRow?.response_payload||null;const employments=Array.isArray(result?.employments)?result.employments:[]
  return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="employment"/><main className="main">
   <div className="top"><div><h1 className="pageTitle">Employment Income</h1><p className="muted">Review HMRC employment and occupational pension sources before the end of year calculation.</p></div><span className="badge">{selected}</span></div>
   {qs.error&&<div className="status statusError"><strong>HMRC needs attention.</strong><div>{qs.error}</div>{qs.correlationId&&<div className="muted">Correlation ID: {qs.correlationId}</div>}</div>}

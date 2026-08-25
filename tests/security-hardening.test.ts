@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { execFileSync } from 'node:child_process'
+import { execFileSync, spawnSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 
 function filesWith(pattern:string,args:string[]=[]){
@@ -57,4 +57,21 @@ test('OAuth state validation rejects malformed state before timing safe comparis
 test('Next.js does not expose the powered-by header',()=>{
   const config=readFileSync('next.config.mjs','utf8')
   assert.match(config,/poweredByHeader:\s*false/)
+})
+
+test('HMRC redirects do not expose raw response payloads in query strings',()=>{
+  const calculationRoute=readFileSync('app/api/hmrc/calculations/retrieve/route.ts','utf8')
+  const quarterlyRoute=readFileSync('app/api/hmrc/quarterly/submit/route.ts','utf8')
+
+  assert.doesNotMatch(calculationRoute,/searchParams\.set\('result'/)
+  assert.doesNotMatch(quarterlyRoute,/searchParams\.set\('hmrcErrors'/)
+  assert.match(quarterlyRoute,/searchParams\.set\('submissionId'/)
+
+  const scan=spawnSync('rg',[
+    "searchParams\\.set\\('(result|hmrcErrors|financialResult|lossResult)'",
+    'app/api/hmrc',
+    '-g',
+    '*.ts',
+  ],{encoding:'utf8'})
+  assert.equal(scan.status,1,scan.stdout || scan.stderr)
 })

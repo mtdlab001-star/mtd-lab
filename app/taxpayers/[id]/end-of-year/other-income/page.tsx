@@ -2,13 +2,13 @@ import Link from 'next/link'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import FraudContextFields from '@/app/components/FraudContextFields'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { latestHmrcResponse } from '@/lib/hmrc-response-audit'
 
 export const dynamic='force-dynamic'
-function decode(value?:string){try{return value?JSON.parse(Buffer.from(value,'base64url').toString('utf8')):null}catch{return null}}
 
 export default async function OtherIncomePage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
  const {id}=await params;const qs=await searchParams;const db=supabaseAdmin();const {data:obligations}=await db.from('hmrc_obligations').select('period_start').eq('taxpayer_id',id).gte('period_start','2025-04-06')
- const years=Array.from(new Set((obligations||[]).map((o:any)=>{const d=String(o.period_start);const y=Number(d.slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse();const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27');const result=decode(qs.result);const is2026On=Number(selected.slice(0,4))>=2026
+ const years=Array.from(new Set((obligations||[]).map((o:any)=>{const d=String(o.period_start);const y=Number(d.slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse();const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27');const stored=await latestHmrcResponse(db,{taxpayerId:id,taxYear:selected,eventType:'other_income_retrieval'});const result=stored?.response_summary||stored?.response_payload||null;const is2026On=Number(selected.slice(0,4))>=2026
  const categories=[['propertyIncomeDistributions','Property income distributions'],['personalInsuranceBenefits','Personal insurance benefits'],['incomeFromUnauthorisedUnitTrust','Unauthorised unit trust income'],['profitsFromCertificateOfDeposit','Certificate of deposit profits'],['nonCashBenefitsFromFormerEmployer','Non cash benefits from former employer'],['authorisedPaymentsFromOverseasPensionScheme','Overseas pension scheme payments'],['taxableAnnualPayments','Taxable annual payments'],['miscellaneousIncome','Miscellaneous income']]
  return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="other-income"/><main className="main">
   <div className="top"><div><h1 className="pageTitle">Other Self Assessment Income</h1><p className="muted">Review and update HMRC Other Income categories before the end of year calculation and declaration.</p></div><span className="badge">{selected}</span></div>
