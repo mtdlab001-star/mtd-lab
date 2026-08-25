@@ -1,0 +1,32 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">MTD Lab</title>
+  <desc id="desc">Transparent MTD Lab logo for authenticated pages</desc>
+  <defs>
+    <linearGradient id="ring" x1="170" x2="854" y1="170" y2="854" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#18b7ff"/>
+      <stop offset=".52" stop-color="#5663ff"/>
+      <stop offset="1" stop-color="#b325ff"/>
+    </linearGradient>
+    <linearGradient id="bluePurple" x1="650" x2="855" y1="320" y2="635" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#0baeff"/>
+      <stop offset=".58" stop-color="#5668ff"/>
+      <stop offset="1" stop-color="#b626ff"/>
+    </linearGradient>
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="4" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  <circle cx="512" cy="512" r="468" fill="none" stroke="#f5f8ff" stroke-opacity=".9" stroke-width="3"/>
+  <circle cx="512" cy="512" r="420" fill="none" stroke="url(#ring)" stroke-width="13" filter="url(#glow)"/>
+  <path fill="#f7fbff" d="M205 356h57l141 132 140-132h279l-44 56H573L405 574 262 438v230h-57V356Zm198 242 56-54v124h-56v-70Zm99-96 57-55v221h-57V502Z"/>
+  <path fill="url(#bluePurple)" d="M682 356h115c34 0 64 13 89 39 24 26 36 58 36 97 0 38-12 70-36 97-25 26-55 39-89 39H644l57-56h96c18 0 34-8 47-23 13-16 19-35 19-57 0-23-6-42-19-57-13-15-29-23-47-23H638l44-56Z"/>
+  <path stroke="url(#ring)" stroke-linecap="round" stroke-width="5" d="M196 733h74m584 0h74"/>
+  <g font-family="Arial, Helvetica, sans-serif" font-size="74" font-weight="800" letter-spacing="18">
+    <text x="316" y="755" fill="#f8fbff">MTD</text>
+    <text x="563" y="755" fill="url(#bluePurple)">LAB</text>
+  </g>
+</svg>

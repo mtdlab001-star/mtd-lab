@@ -18,7 +18,7 @@ export default async function TaxpayersPage({ searchParams }: { searchParams: Pr
 
   return <div className="shell">
     <aside className="side">
-      <div className="brand"><img className="brandLogo" src="/mtd-lab-logo-exact.webp" alt="MTD Lab"/></div>
+      <div className="brand"><img className="brandLogo" src="/mtd-lab-logo-post-login.svg" alt="MTD Lab"/></div>
       <div className="nav"><Link href="/">Dashboard</Link><Link className="navActive" href="/taxpayers">Taxpayers</Link><Link href="/agents">Agents</Link><Link href="/taxpayers/sandbox">Sandbox setup</Link></div>
       <div className="operator">Operated by Glomaxel IT Service</div>
     </aside>
