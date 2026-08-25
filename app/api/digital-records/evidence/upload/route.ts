@@ -6,6 +6,14 @@ import { recordDigitalRecordAudit } from '@/lib/digital-record-audit'
 const allowed=new Set(['application/pdf','image/jpeg','image/png','image/webp'])
 function safeName(value:string){return value.normalize('NFKC').replace(/[^a-zA-Z0-9._-]+/g,'-').replace(/^-+|-+$/g,'').slice(-120)||'evidence'}
 
+function matchesDeclaredType(bytes:Uint8Array,type:string){
+ if(type==='application/pdf')return bytes.length>=5&&bytes[0]===0x25&&bytes[1]===0x50&&bytes[2]===0x44&&bytes[3]===0x46&&bytes[4]===0x2d
+ if(type==='image/jpeg')return bytes.length>=3&&bytes[0]===0xff&&bytes[1]===0xd8&&bytes[2]===0xff
+ if(type==='image/png')return bytes.length>=8&&bytes[0]===0x89&&bytes[1]===0x50&&bytes[2]===0x4e&&bytes[3]===0x47&&bytes[4]===0x0d&&bytes[5]===0x0a&&bytes[6]===0x1a&&bytes[7]===0x0a
+ if(type==='image/webp')return bytes.length>=12&&String.fromCharCode(...bytes.slice(0,4))==='RIFF'&&String.fromCharCode(...bytes.slice(8,12))==='WEBP'
+ return false
+}
+
 export async function POST(req:Request){
  if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const form=await req.formData();const taxpayerId=String(form.get('taxpayerId')||'');const recordId=String(form.get('recordId')||'');const businessId=String(form.get('businessId')||'');const sourceType=String(form.get('sourceType')||'');const file=form.get('file');const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/digital-records`,req.url)
@@ -13,10 +21,12 @@ export async function POST(req:Request){
  if(!taxpayerId||!recordId||!(file instanceof File)){back.searchParams.set('error','Choose a supporting document.');return NextResponse.redirect(back,303)}
  if(file.size<=0||file.size>10_000_000){back.searchParams.set('error','Supporting documents must be between 1 byte and 10 MB.');return NextResponse.redirect(back,303)}
  if(!allowed.has(file.type)){back.searchParams.set('error','Supporting documents must be PDF, JPEG, PNG or WebP.');return NextResponse.redirect(back,303)}
+ const fileBuffer=await file.arrayBuffer();const bytes=new Uint8Array(fileBuffer.slice(0,16))
+ if(!matchesDeclaredType(bytes,file.type)){back.searchParams.set('error','The uploaded file content does not match its declared file type.');return NextResponse.redirect(back,303)}
  const db=supabaseAdmin();const {data:row}=await db.from('mtd_digital_records').select('id,taxpayer_id,business_id,tax_year,document_url').eq('id',recordId).eq('taxpayer_id',taxpayerId).maybeSingle()
  if(!row){back.searchParams.set('error','Digital record was not found.');return NextResponse.redirect(back,303)}
  const objectPath=`${taxpayerId}/${row.business_id}/${recordId}/${crypto.randomUUID()}-${safeName(file.name)}`
- const {error:uploadError}=await db.storage.from('mtd-evidence').upload(objectPath,await file.arrayBuffer(),{contentType:file.type,upsert:false,cacheControl:'3600'})
+ const {error:uploadError}=await db.storage.from('mtd-evidence').upload(objectPath,fileBuffer,{contentType:file.type,upsert:false,cacheControl:'3600'})
  if(uploadError){back.searchParams.set('error',uploadError.message);return NextResponse.redirect(back,303)}
  const {error:updateError}=await db.from('mtd_digital_records').update({document_url:objectPath,document_name:file.name,document_mime_type:file.type,document_size:file.size,document_uploaded_at:new Date().toISOString()}).eq('id',recordId).eq('taxpayer_id',taxpayerId)
  if(updateError){await db.storage.from('mtd-evidence').remove([objectPath]);back.searchParams.set('error',updateError.message);return NextResponse.redirect(back,303)}
