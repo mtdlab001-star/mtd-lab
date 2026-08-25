@@ -3,7 +3,7 @@ import type { NextRequest } from 'next/server'
 import { verifyAppSession } from './lib/app-auth'
 
 const securityHeaders=[
-  ['Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline' 'unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"],
+  ['Content-Security-Policy',"default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"],
   ['X-Frame-Options','DENY'],
   ['X-Content-Type-Options','nosniff'],
   ['Referrer-Policy','strict-origin-when-cross-origin'],
