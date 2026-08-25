@@ -36,8 +36,8 @@ test('login rate limiting fails closed when its protection is unavailable',()=>{
 
 test('evidence uploads verify actual file signatures',()=>{
   const source=readFileSync('app/api/digital-records/evidence/upload/route.ts','utf8')
-  assert.match(source,/detectMimeType/)
-  assert.match(source,/file signature/i)
+  assert.match(source,/matchesDeclaredType/)
+  assert.match(source,/uploaded file content does not match its declared file type/i)
 })
 
 test('OAuth state validation rejects malformed state before timing safe comparison',()=>{
