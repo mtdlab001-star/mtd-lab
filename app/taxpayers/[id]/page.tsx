@@ -2,7 +2,8 @@ import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import { assessHmrcConnection } from '@/lib/hmrc-connection-status'
-import { incomeSourceType, type MtdIncomeSourceType } from '@/lib/mtd-income-source'
+import type { MtdIncomeSourceType } from '@/lib/mtd-income-source'
+import { mergeMtdIncomeSources } from '@/lib/mtd-income-sources-server'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,10 @@ export default async function TaxpayerPage({ params, searchParams }: { params: P
   const connectionStatus=assessHmrcConnection(connection)
   const latestError=qs.error||syncError
   const needsMatchingGrant=String(latestError||'').toLowerCase().includes('not authorised')
-  const eligibleObligations = obligations.filter(o=>String(o.period_start||'')>='2025-04-06')
+  const incomeSources = mergeMtdIncomeSources(businesses, obligations)
+  const visibleBusinessIds = new Set(incomeSources.map(source=>source.businessId))
+  const sourceByBusinessId = new Map(incomeSources.map(source=>[source.businessId,source]))
+  const eligibleObligations = obligations.filter(o=>String(o.period_start||'')>='2025-04-06'&&(visibleBusinessIds.size===0||visibleBusinessIds.has(String(o.business_id||'').trim())))
   const eligibleOpen = eligibleObligations.filter(o=>String(o.status).toLowerCase()==='open')
   const acceptedPending = eligibleOpen.filter(o=>!!acceptedSubmissionFor(submissions,o))
   const actionableOpen = eligibleOpen.filter(o=>!acceptedSubmissionFor(submissions,o))
@@ -28,7 +32,7 @@ export default async function TaxpayerPage({ params, searchParams }: { params: P
   const selectedYear = requestedYear === 'all' || eligibleYears.includes(requestedYear) ? requestedYear : 'all'
   const visibleObligations = selectedYear === 'all' ? eligibleObligations : eligibleObligations.filter(o=>taxYearFor(o.period_start)===selectedYear)
   const groupedObligations = visibleObligations.reduce((map:Map<string,any[]>,obligation:any)=>{const key=obligation.business_id||'not-supplied';const rows=map.get(key)||[];rows.push(obligation);map.set(key,rows);return map},new Map<string,any[]>())
-  const obligationGroups = Array.from(groupedObligations.entries()).map(([businessId,rows])=>{const business=businesses.find((b:any)=>b.business_id===businessId);const sourceType=business?incomeSourceType(business):obligationIncomeSourceType(businessId);const label=sourceType==='self-employment'?'Self Assessment':sourceType==='uk-property'?'UK Property':'Foreign Property';const businessName=business?.business_name||null;const open=rows.filter((o:any)=>String(o.status||'').toLowerCase()==='open');const fulfilled=rows.filter((o:any)=>String(o.status||'').toLowerCase()==='fulfilled');const actionable=open.filter((o:any)=>!acceptedSubmissionFor(submissions,o));const groupNextDue=actionable.map((o:any)=>o.due_date).filter(Boolean).sort()[0]||null;return {businessId,label,businessName,sourceType,rows,total:rows.length,open:open.length,fulfilled:fulfilled.length,nextDue:groupNextDue}}).sort((a:any,b:any)=>{const order:Record<string,number>={'self-employment':0,'uk-property':1,'foreign-property':2};return (order[a.sourceType]??10)-(order[b.sourceType]??10)||String(a.businessName||a.businessId).localeCompare(String(b.businessName||b.businessId))})
+  const obligationGroups = Array.from(groupedObligations.entries()).map(([businessId,rows])=>{const source=sourceByBusinessId.get(businessId);const sourceType=source?.sourceType||obligationIncomeSourceType(businessId);const label=sourceType==='self-employment'?'Self Assessment':sourceType==='uk-property'?'UK Property':'Foreign Property';const businessName=source?.businessName||null;const open=rows.filter((o:any)=>String(o.status||'').toLowerCase()==='open');const fulfilled=rows.filter((o:any)=>String(o.status||'').toLowerCase()==='fulfilled');const actionable=open.filter((o:any)=>!acceptedSubmissionFor(submissions,o));const groupNextDue=actionable.map((o:any)=>o.due_date).filter(Boolean).sort()[0]||null;return {businessId,label,businessName,sourceType,rows,total:rows.length,open:open.length,fulfilled:fulfilled.length,nextDue:groupNextDue}}).sort((a:any,b:any)=>{const order:Record<string,number>={'self-employment':0,'uk-property':1,'foreign-property':2};return (order[a.sourceType]??10)-(order[b.sourceType]??10)||String(a.businessName||a.businessId).localeCompare(String(b.businessName||b.businessId))})
   const sourceTypes = Array.from(new Set(obligationGroups.map((group:any)=>group.sourceType).filter(Boolean))) as MtdIncomeSourceType[]
   const legacyOnly = obligations.length>0 && eligibleObligations.length===0
   const nextDue = actionableOpen.map(o=>o.due_date).filter(Boolean).sort()[0]
