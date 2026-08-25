@@ -17,6 +17,14 @@ test('obligation fallback sources are used only when HMRC returned no businesses
 test('taxpayer overview filters grouped obligations to visible income sources',()=>{
   const page=readFileSync(new URL('../app/taxpayers/[id]/page.tsx',import.meta.url),'utf8')
   assert.match(page,/const incomeSources = mergeMtdIncomeSources\(businesses, obligations\)/)
-  assert.match(page,/visibleBusinessIds\.has\(String\(o\.business_id\|\|''\)\.trim\(\)\)/)
-  assert.match(page,/const sourceByBusinessId = new Map\(incomeSources\.map\(source=>\[source\.businessId,source\]\)\)/)
+  assert.match(page,/visibleBusinessIds\.has\(String\(o\.business_id \|\| ''\)\.trim\(\)\)/)
+  assert.match(page,/const sourceByBusinessId = new Map\(incomeSources\.map\(source => \[source\.businessId, source\]\)\)/)
+})
+
+test('taxpayer overview uses the quarterly obligations table arrangement',()=>{
+  const page=readFileSync(new URL('../app/taxpayers/[id]/page.tsx',import.meta.url),'utf8')
+  assert.match(page,/Quarterly Obligations/)
+  assert.match(page,/Submission Date & Time/)
+  assert.match(page,/Retrieve Obligations/)
+  assert.match(page,/Annual Submission/)
 })
