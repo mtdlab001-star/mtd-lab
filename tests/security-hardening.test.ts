@@ -17,11 +17,33 @@ test('all POST API routes reject cross-site requests',()=>{
   }
 })
 
-test('security headers deny framing and do not allow eval',()=>{
+test('security headers deny framing, active objects and insecure transport',()=>{
   const middleware=readFileSync('middleware.ts','utf8')
   assert.match(middleware,/frame-ancestors 'none'/)
   assert.match(middleware,/X-Frame-Options','DENY'/)
+  assert.match(middleware,/object-src 'none'/)
+  assert.match(middleware,/upgrade-insecure-requests/)
+  assert.match(middleware,/Strict-Transport-Security/)
+  assert.match(middleware,/X-Content-Type-Options','nosniff'/)
   assert.doesNotMatch(middleware,/unsafe-eval/)
+})
+
+test('login rate limiting fails closed when its protection is unavailable',()=>{
+  const source=readFileSync('lib/login-rate-limit.ts','utf8')
+  assert.match(source,/if \(!rateLimitSecret\(\)\) \{\s*return \{ ipHash: '', usernameHash: '', limited: true,/s)
+  assert.match(source,/catch \(error\) \{\s*console\.error\('Login rate limit check failed', error\)\s*return \{ ipHash: '', usernameHash: '', limited: true,/s)
+})
+
+test('evidence uploads verify actual file signatures',()=>{
+  const source=readFileSync('app/api/digital-records/evidence/upload/route.ts','utf8')
+  assert.match(source,/detectMimeType/)
+  assert.match(source,/file signature/i)
+})
+
+test('OAuth state validation rejects malformed state before timing safe comparison',()=>{
+  const source=readFileSync('lib/oauth-state.ts','utf8')
+  assert.match(source,/timingSafeEqual/)
+  assert.match(source,/supplied\.length!==expected\.length/)
 })
 
 test('Next.js does not expose the powered-by header',()=>{
