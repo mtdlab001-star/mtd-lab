@@ -14,6 +14,13 @@ const securityHeaders=[
   ['X-Permitted-Cross-Domain-Policies','none'],
 ] as const
 
+const publicAssets=new Set([
+  '/mtd-lab-logo-exact.webp',
+  '/mtd-lab-login-wordmark.svg',
+  '/mtd-lab-logo-post-login.svg',
+  '/mtd-lab-logo.svg',
+])
+
 function secure(res:NextResponse){
   for(const [key,value] of securityHeaders)res.headers.set(key,value)
   return res
@@ -21,8 +28,7 @@ function secure(res:NextResponse){
 
 export async function middleware(req:NextRequest){
   const path=req.nextUrl.pathname
-  const publicAsset=/\.(?:png|jpe?g|webp|svg|ico)$/i.test(path)
-  if(path==='/login'||publicAsset||path.startsWith('/api/auth/')||path.startsWith('/_next/')) return secure(NextResponse.next())
+  if(path==='/login'||publicAssets.has(path)||path.startsWith('/api/auth/')||path.startsWith('/_next/')) return secure(NextResponse.next())
   const valid=await verifyAppSession(req.cookies.get('mtdlab_session')?.value)
   if(valid) return secure(NextResponse.next())
   const login=req.nextUrl.clone()
