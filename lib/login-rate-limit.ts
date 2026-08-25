@@ -53,7 +53,7 @@ async function countFailedAttempts(ipHash: string, usernameHash: string) {
   const db = supabaseAdmin()
   const [ipAttempts, usernameAttempts] = await Promise.all([
     db.from('app_login_attempts').select('id', { count: 'exact', head: true }).eq('success', false).eq('ip_hash', ipHash).gte('created_at', since),
-    db.from('app_login_attempts').select('id', { count: 'exact', head: true }).eq('success', false).eq('username_hash', usernameHash).gte('created_at', since),
+    db.from('app_login_attempts').select('id', { count: 'exact', head: true }).eq('username_hash', usernameHash).gte('created_at', since),
   ])
 
   if (ipAttempts.error) throw ipAttempts.error
@@ -67,7 +67,7 @@ async function countFailedAttempts(ipHash: string, usernameHash: string) {
 
 export async function assessLoginRateLimit(req: Request, username: string): Promise<RateLimitResult> {
   if (!rateLimitSecret()) {
-    return { ipHash: '', usernameHash: '', limited: false, retryAfterSeconds: 0 }
+    return { ipHash: '', usernameHash: '', limited: true, retryAfterSeconds: 60 }
   }
 
   try {
@@ -82,7 +82,7 @@ export async function assessLoginRateLimit(req: Request, username: string): Prom
     }
   } catch (error) {
     console.error('Login rate limit check failed', error)
-    return { ipHash: '', usernameHash: '', limited: false, retryAfterSeconds: 0 }
+    return { ipHash: '', usernameHash: '', limited: true, retryAfterSeconds: 60 }
   }
 }
 
