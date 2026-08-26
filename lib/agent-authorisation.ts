@@ -34,3 +34,44 @@ export async function agentCan(taxpayerId:string,agentId:string,permission:Agent
   if(row.mtd_agents?.status&&row.mtd_agents.status!=='active') return false
   return row[permission]===true
 }
+
+export async function resolveConnectedAgentForPermission(taxpayerId:string,permission:AgentPermission,requestedAgentId?:string|null){
+  const db=supabaseAdmin()
+  await expireAgentAuthorisations(taxpayerId)
+
+  const {data:authorisations,error:authorisationError}=await db
+    .from('mtd_agent_authorisations')
+    .select('agent_id,expires_at,revoked_at,mtd_agents(status)')
+    .eq('taxpayer_id',taxpayerId)
+    .eq('status','authorised')
+    .eq(permission,true)
+  if(authorisationError) throw authorisationError
+
+  const active=(authorisations||[]).filter((row:any)=>{
+    if(row.revoked_at) return false
+    if(row.expires_at&&new Date(row.expires_at).getTime()<=Date.now()) return false
+    return !row.mtd_agents?.status||row.mtd_agents.status==='active'
+  })
+
+  const ids=active.map((row:any)=>String(row.agent_id)).filter(Boolean)
+  if(!ids.length){
+    if(requestedAgentId) throw new Error('The selected agent is not currently authorised for this HMRC action.')
+    return null
+  }
+
+  const {data:connections,error:connectionError}=await db
+    .from('agent_hmrc_connections')
+    .select('agent_id,access_token,refresh_token')
+    .in('agent_id',ids)
+  if(connectionError) throw connectionError
+  const connected=new Set((connections||[]).filter((row:any)=>row.access_token||row.refresh_token).map((row:any)=>String(row.agent_id)))
+
+  if(requestedAgentId){
+    if(!ids.includes(requestedAgentId)) throw new Error('The selected agent is not currently authorised for this HMRC action.')
+    if(!connected.has(requestedAgentId)) throw new Error('Connect this agent ASA to HMRC before acting for this taxpayer.')
+    return requestedAgentId
+  }
+
+  const eligible=ids.filter((id:string)=>connected.has(id))
+  return eligible.length===1?eligible[0]:null
+}
