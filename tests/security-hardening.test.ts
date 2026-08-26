@@ -59,6 +59,19 @@ test('Next.js does not expose the powered-by header',()=>{
   assert.match(config,/poweredByHeader:\s*false/)
 })
 
+test('Next.js is pinned to the patched maintenance security release',()=>{
+  const pkg=JSON.parse(readFileSync('package.json','utf8'))
+  assert.equal(pkg.dependencies.next,'15.5.24')
+})
+
+test('Excel template uploads validate xlsx files before parsing',()=>{
+  const source=readFileSync('app/api/templates/upload/route.ts','utf8')
+  assert.match(source,/function isXlsxFile/)
+  assert.match(source,/file\.name\.toLowerCase\(\)\.endsWith\('\.xlsx'\)/)
+  assert.match(source,/buffer\[0\]===0x50&&buffer\[1\]===0x4b&&buffer\[2\]===0x03&&buffer\[3\]===0x04/)
+  assert.match(source,/if\(!isXlsxFile\(file,uploadBuffer\)\)throw new Error/)
+})
+
 test('HMRC redirects do not expose raw response payloads in query strings',()=>{
   const calculationRoute=readFileSync('app/api/hmrc/calculations/retrieve/route.ts','utf8')
   const quarterlyRoute=readFileSync('app/api/hmrc/quarterly/submit/route.ts','utf8')
