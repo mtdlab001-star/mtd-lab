@@ -88,3 +88,34 @@ test('HMRC redirects do not expose raw response payloads in query strings',()=>{
   ],{encoding:'utf8'})
   assert.equal(scan.status,1,scan.stdout || scan.stderr)
 })
+
+test('delegated HMRC filing uses the authorised agent ASA connection',()=>{
+  const connection=readFileSync('lib/hmrc-connection.ts','utf8')
+  assert.match(connection,/agent_hmrc_connections/)
+  assert.match(connection,/getValidAgentHmrcAccessToken/)
+  assert.match(connection,/getHmrcAccessTokenForActingCapacity/)
+
+  const quarterlyRoute=readFileSync('app/api/hmrc/quarterly/submit/route.ts','utf8')
+  const finalRoute=readFileSync('app/api/hmrc/calculations/final-declaration/route.ts','utf8')
+  const triggerRoute=readFileSync('app/api/hmrc/calculations/trigger/route.ts','utf8')
+  const retrieveRoute=readFileSync('app/api/hmrc/calculations/retrieve/route.ts','utf8')
+
+  for(const source of [quarterlyRoute,finalRoute,triggerRoute,retrieveRoute]){
+    assert.match(source,/agentCan\(taxpayerId,actingAgentId,/)
+    assert.match(source,/getHmrcAccessTokenForActingCapacity\(taxpayerId,actingAgentId\)/)
+  }
+})
+
+test('agent ASA OAuth state and callback are stored separately from taxpayer OAuth',()=>{
+  const state=readFileSync('lib/oauth-state.ts','utf8')
+  const start=readFileSync('app/api/hmrc/oauth/start/route.ts','utf8')
+  const callback=readFileSync('app/api/hmrc/callback/route.ts','utf8')
+  const agentsPage=readFileSync('app/taxpayers/[id]/agents/page.tsx','utf8')
+
+  assert.match(state,/agentId/)
+  assert.match(start,/searchParams\.get\('agentId'\)/)
+  assert.match(callback,/agent_hmrc_connections/)
+  assert.match(callback,/agentConnected=1/)
+  assert.match(agentsPage,/Connect ASA/)
+  assert.match(agentsPage,/agentId=\$\{encodeURIComponent\(r\.agent_id\)\}/)
+})

@@ -5,10 +5,11 @@ import { signState } from '@/lib/oauth-state'
 export async function GET(req: Request) {
   const url = new URL(req.url)
   const taxpayerId = url.searchParams.get('taxpayerId') || 'demo'
+  const agentId = url.searchParams.get('agentId')?.trim() || null
   const clientId = process.env.HMRC_CLIENT_ID?.trim()
   const redirectUri = process.env.HMRC_REDIRECT_URI?.trim()
   if (!clientId || !redirectUri) return NextResponse.json({ error: 'HMRC OAuth configuration missing' }, { status: 503 })
-  const state = signState(taxpayerId)
+  const state = signState(taxpayerId, agentId)
   const auth = new URL(`${hmrcWebBase}/oauth/authorize`)
   auth.searchParams.set('response_type', 'code')
   auth.searchParams.set('client_id', clientId)

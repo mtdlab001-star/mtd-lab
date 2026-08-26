@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { verifyReviewPayload } from '@/lib/review-token'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcApiBase,hmrcGet } from '@/lib/hmrc'
-import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
+import { getHmrcAccessTokenForActingCapacity } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
 import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 import { normaliseHmrcErrors } from '@/lib/hmrc-errors'
@@ -32,7 +32,7 @@ export async function POST(req:Request){
  if(actingAgentId){const allowed=await agentCan(taxpayerId,actingAgentId,'can_submit_quarterly');if(!allowed){back.searchParams.set('error','The selected agent is not currently authorised to submit quarterly updates for this taxpayer.');return NextResponse.redirect(back,303)}}
  if(process.env.HMRC_ENVIRONMENT==='production'&&process.env.HMRC_ALLOW_PRODUCTION_SUBMISSIONS!=='true'){back.searchParams.set('error','Production HMRC submissions are locked. Complete sandbox testing and explicitly enable production submissions first.');return NextResponse.redirect(back,303)}
  const db=supabaseAdmin();const {data:taxpayer,error:taxpayerError}=await db.from('taxpayers').select('nino').eq('id',taxpayerId).maybeSingle();if(taxpayerError||!taxpayer?.nino){back.searchParams.set('error','HMRC taxpayer record is missing a NINO');return NextResponse.redirect(back,303)}
- let accessToken:string;try{accessToken=await getValidHmrcAccessToken(taxpayerId)}catch(e:any){back.searchParams.set('error',e.message||'HMRC connection is incomplete');return NextResponse.redirect(back,303)}
+ let accessToken:string;try{accessToken=await getHmrcAccessTokenForActingCapacity(taxpayerId,actingAgentId)}catch(e:any){back.searchParams.set('error',e.message||'HMRC connection is incomplete');return NextResponse.redirect(back,303)}
  const fraud=buildFraudHeaders(req,form,taxpayerId);if(fraud.missing.length){back.searchParams.set('readiness','blocked');back.searchParams.set('missing',fraud.missing.join(','));return NextResponse.redirect(back,303)}
  const taxYear=taxYearFromDate(p.periodStart);const type=String(p.incomeSourceType||p.filingType||'self-employment');let requestPayload:any;let endpoint:string;let acceptHeader:string
  if(type==='foreign-property'){const propertyId=await foreignPropertyId(taxpayer.nino,p.businessId,taxYear,accessToken,p.countryCode);if(Number(taxYear.slice(0,4))>=2026&&!propertyId){back.searchParams.set('error','HMRC has no foreign property detail record for this tax year. Create or sync the foreign property detail before submitting this quarterly update.');return NextResponse.redirect(back,303)}requestPayload=buildForeignPropertyCumulativePayload({...p,propertyId},taxYear);endpoint=foreignPropertyCumulativeEndpoint(taxpayer.nino,p.businessId,taxYear);acceptHeader=hmrcAcceptHeader('propertyBusiness')}else if(type==='uk-property'||type==='property'){requestPayload=buildUkPropertyCumulativePayload(p);endpoint=ukPropertyCumulativeEndpoint(taxpayer.nino,p.businessId,taxYear);acceptHeader=hmrcAcceptHeader('propertyBusiness')}else{requestPayload=buildSelfEmploymentCumulativePayload(p);endpoint=cumulativeEndpoint(taxpayer.nino,p.businessId,taxYear);acceptHeader=hmrcAcceptHeader('selfEmploymentBusiness')}
