@@ -50,7 +50,7 @@ export async function POST(req:Request){
     const relationshipPayload={service:'MTD-IT',clientIdType:'ni',clientId:nino,knownFact,agentType}
 
     const checkRelationship=async()=>{
-      const res=await fetch(`${hmrcApiBase}/agents/${encodeURIComponent(arn)}/relationships`,{method:'POST',headers:{Authorization:`Bearer ${accessToken}`,Accept:ACCEPT_V1,'Content-Type':'application/json'},body:JSON.stringify(relationshipPayload),cache:'no-store'})
+      const res=await fetch(`${hmrcApiBase}/agents/${encodeURIComponent(arn)}/relationships`,{method:'POST',headers:{Authorization:`Bearer ${accessToken}`,Accept:ACCEPT_V2,'Content-Type':'application/json'},body:JSON.stringify(relationshipPayload),cache:'no-store'})
       const payload=await jsonOrEmpty(res)
       if(res.status===204)return {active:true,payload}
       if(res.status===404)return {active:false,payload}
