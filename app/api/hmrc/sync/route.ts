@@ -1,9 +1,10 @@
 import { NextResponse } from 'next/server'
 import { hmrcGet } from '@/lib/hmrc'
-import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
+import { getHmrcAccessTokenForActingCapacity } from '@/lib/hmrc-connection'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 import { isSameOriginRequest } from '@/lib/request-security'
+import { resolveConnectedAgentForPermission } from '@/lib/agent-authorisation'
 
 function firstValue(obj:any,keys:string[]){for(const key of keys){const value=obj?.[key];if(value!==undefined&&value!==null&&value!=='')return value}return null}
 function throwIfError(error:any,context:string){if(error)throw new Error(`${context}: ${error.message||JSON.stringify(error)}`)}
@@ -47,9 +48,11 @@ export async function POST(req:Request){
   const taxpayerId=String(form.get('taxpayerId')||'demo')
   const nino=String(form.get('nino')||'').trim().toUpperCase()
   const mtditid=String(form.get('mtditid')||'').trim().toUpperCase()
+  const requestedAgentId=String(form.get('actingAgentId')||'').trim()||null
   const db=supabaseAdmin()
   try{
-    const accessToken=await getValidHmrcAccessToken(taxpayerId)
+    const actingAgentId=await resolveConnectedAgentForPermission(taxpayerId,'can_view_obligations',requestedAgentId)
+    const accessToken=await getHmrcAccessTokenForActingCapacity(taxpayerId,actingAgentId)
     const {error:taxpayerError}=await db.from('taxpayers').upsert({id:taxpayerId,display_name:taxpayerId==='demo'?'HMRC Sandbox Taxpayer':taxpayerId,nino,mtditid,updated_at:new Date().toISOString()})
     throwIfError(taxpayerError,'Taxpayer update failed')
 
@@ -91,7 +94,9 @@ export async function POST(req:Request){
 
     const {error:syncLogError}=await db.from('hmrc_sync_runs').insert({taxpayer_id:taxpayerId,status:'complete',businesses_count:list.length,obligations_count:uniqueObligations.length,completed_at:new Date().toISOString()})
     throwIfError(syncLogError,'Saving sync log failed')
-    return NextResponse.redirect(new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}?synced=1`,req.url),303)
+    const resultUrl=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}?synced=1`,req.url)
+    if(actingAgentId)resultUrl.searchParams.set('actingAs','agent')
+    return NextResponse.redirect(resultUrl,303)
   }catch(e:any){
     await db.from('hmrc_sync_runs').insert({taxpayer_id:taxpayerId,status:'failed',error_message:e.message||'Sync failed',completed_at:new Date().toISOString()})
     return NextResponse.redirect(new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}?error=${encodeURIComponent(e.message||'Sync failed')}`,req.url),303)
