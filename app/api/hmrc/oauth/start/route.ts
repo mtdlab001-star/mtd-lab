@@ -9,13 +9,17 @@ export async function GET(req: Request) {
   const clientId = process.env.HMRC_CLIENT_ID?.trim()
   const redirectUri = process.env.HMRC_REDIRECT_URI?.trim()
   if (!clientId || !redirectUri) return NextResponse.json({ error: 'HMRC OAuth configuration missing' }, { status: 503 })
+
   const state = signState(taxpayerId, agentId)
   const auth = new URL(`${hmrcWebBase}/oauth/authorize`)
   auth.searchParams.set('response_type', 'code')
   auth.searchParams.set('client_id', clientId)
+
   const taxpayerScopes = ['read:self-assessment', 'write:self-assessment']
   const agentAuthorisationScopes = ['write:sent-invitations', 'read:sent-invitations', 'read:check-relationship']
-  auth.searchParams.set('scope', [...taxpayerScopes, ...(agentId ? agentAuthorisationScopes : [])].join(' '))
+  const scopes = agentId ? agentAuthorisationScopes : taxpayerScopes
+  auth.searchParams.set('scope', scopes.join(' '))
+
   auth.searchParams.set('state', state)
   auth.searchParams.set('redirect_uri', redirectUri)
   return NextResponse.redirect(auth)
