@@ -13,7 +13,9 @@ export async function GET(req: Request) {
   const auth = new URL(`${hmrcWebBase}/oauth/authorize`)
   auth.searchParams.set('response_type', 'code')
   auth.searchParams.set('client_id', clientId)
-  auth.searchParams.set('scope', 'read:self-assessment write:self-assessment')
+  const taxpayerScopes = ['read:self-assessment', 'write:self-assessment']
+  const agentAuthorisationScopes = ['write:sent-invitations', 'read:sent-invitations', 'read:check-relationship']
+  auth.searchParams.set('scope', [...taxpayerScopes, ...(agentId ? agentAuthorisationScopes : [])].join(' '))
   auth.searchParams.set('state', state)
   auth.searchParams.set('redirect_uri', redirectUri)
   return NextResponse.redirect(auth)
