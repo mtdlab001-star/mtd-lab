@@ -17,7 +17,13 @@ export async function GET(req: Request) {
 
   const taxpayerScopes = ['read:self-assessment', 'write:self-assessment']
   const agentAuthorisationScopes = ['write:sent-invitations', 'read:sent-invitations', 'read:check-relationship']
-  const scopes = agentId ? agentAuthorisationScopes : taxpayerScopes
+  // An agent connection is used for two distinct HMRC jobs: managing the
+  // client relationship and calling MTD Income Tax endpoints on the client's
+  // behalf. Request both scope families so the stored agent token can perform
+  // the actual quarterly submission after HMRC confirms the relationship.
+  const scopes = agentId
+    ? [...taxpayerScopes, ...agentAuthorisationScopes]
+    : taxpayerScopes
   auth.searchParams.set('scope', scopes.join(' '))
 
   auth.searchParams.set('state', state)
