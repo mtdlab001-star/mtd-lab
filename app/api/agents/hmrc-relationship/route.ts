@@ -73,6 +73,15 @@ export async function POST(req:Request){
     const invitationPayload={service:'MTD-IT',clientType:'personal',clientIdType:'ni',clientId:nino,knownFact,agentType}
     const invitationRes=await fetch(`${hmrcApiBase}/agents/${encodeURIComponent(arn)}/invitations`,{method:'POST',headers:{Authorization:`Bearer ${accessToken}`,Accept:ACCEPT_V2,'Content-Type':'application/json'},body:JSON.stringify(invitationPayload),cache:'no-store'})
     const invitationBody=await jsonOrEmpty(invitationRes)
+
+    if(invitationRes.status===403&&invitationBody?.code==='ALREADY_AUTHORISED'){
+      const result=await checkRelationship()
+      if(!result.active)throw new Error('HMRC reports that the client has already authorised this agent, but the relationship check is not active. Use Check HMRC to verify the current relationship.')
+      back.searchParams.set('hmrcRelationship','active')
+      back.searchParams.set('alreadyAuthorised','1')
+      return NextResponse.redirect(back,303)
+    }
+
     if(invitationRes.status!==204)throw hmrcError('Create HMRC authorisation request',invitationBody,invitationRes.status)
     const location=invitationRes.headers.get('location')||''
     const invitationId=location.split('/').filter(Boolean).pop()
