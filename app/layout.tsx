@@ -1,5 +1,6 @@
 import './globals.css'
 import ClearWarningsOnRefresh from '@/app/components/ClearWarningsOnRefresh'
+import AutoCollapseLongSections from '@/app/components/AutoCollapseLongSections'
 
 export const metadata = {
   title: 'MTD Lab',
@@ -12,5 +13,5 @@ export const metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><body><ClearWarningsOnRefresh />{children}</body></html>
+  return <html lang="en"><body><ClearWarningsOnRefresh /><AutoCollapseLongSections />{children}</body></html>
 }
