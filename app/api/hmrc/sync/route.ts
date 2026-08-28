@@ -51,7 +51,12 @@ export async function POST(req:Request){
   const requestedAgentId=String(form.get('actingAgentId')||'').trim()||null
   const db=supabaseAdmin()
   try{
-    const actingAgentId=await resolveConnectedAgentForPermission(taxpayerId,'can_view_obligations',requestedAgentId)
+    // A normal taxpayer sync must use the taxpayer's own HMRC connection.
+    // Only use agent acting capacity when an agent was explicitly selected by the request.
+    const actingAgentId=requestedAgentId
+      ? await resolveConnectedAgentForPermission(taxpayerId,'can_view_obligations',requestedAgentId)
+      : null
+    if(requestedAgentId&&!actingAgentId)throw new Error('The selected agent is not connected or authorised to view this taxpayer’s HMRC obligations.')
     const accessToken=await getHmrcAccessTokenForActingCapacity(taxpayerId,actingAgentId)
     const {error:taxpayerError}=await db.from('taxpayers').upsert({id:taxpayerId,display_name:taxpayerId==='demo'?'HMRC Sandbox Taxpayer':taxpayerId,nino,mtditid,updated_at:new Date().toISOString()})
     throwIfError(taxpayerError,'Taxpayer update failed')
