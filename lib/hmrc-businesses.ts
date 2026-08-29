@@ -2,6 +2,10 @@ function businessId(business:any){
   return String(business?.incomeSourceId||business?.businessId||'').trim()
 }
 
+export function hmrcBusinessType(business:any){
+  return business?.incomeSourceType||business?.typeOfBusiness||business?.type||null
+}
+
 export function mergeBusinessPayloads(payloads:any[]){
   const businesses=new Map<string,any>()
   for(const payload of payloads){
