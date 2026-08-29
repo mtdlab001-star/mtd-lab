@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 export const dynamic = 'force-dynamic'
 
-export async function POST() {
+export async function POST(req: Request) {
+  if (!isSameOriginRequest(req)) return new NextResponse('Invalid request origin', { status: 403 })
+
   if (process.env.HMRC_ENV === 'production' || process.env.NODE_ENV === 'production' && process.env.HMRC_BASE_URL?.includes('api.service.hmrc.gov.uk') && !process.env.HMRC_BASE_URL?.includes('test-api')) {
     return NextResponse.json({ error: 'Sandbox test user creation is disabled in production HMRC mode.' }, { status: 403 })
   }
