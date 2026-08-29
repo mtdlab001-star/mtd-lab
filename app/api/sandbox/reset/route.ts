@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { isSameOriginRequest } from '@/lib/request-security'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,13 +11,15 @@ function isHmrcSandbox() {
   return process.env.HMRC_ENV !== 'production' && base.includes('test-api.service.hmrc.gov.uk')
 }
 
-export async function POST(request: Request) {
+export async function POST(req: Request) {
+  if (!isSameOriginRequest(req)) return new NextResponse('Invalid request origin', { status: 403 })
+
   if (!isHmrcSandbox()) {
     return NextResponse.json({ error: 'Sandbox reset is disabled outside the HMRC sandbox.' }, { status: 403 })
   }
 
   let body: any = {}
-  try { body = await request.json() } catch {}
+  try { body = await req.json() } catch {}
   if (String(body?.confirmation || '').trim() !== CONFIRMATION) {
     return NextResponse.json({ error: `Type ${CONFIRMATION} exactly to confirm.` }, { status: 400 })
   }
