@@ -5,6 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 import { isSameOriginRequest } from '@/lib/request-security'
 import { resolveConnectedAgentForPermission } from '@/lib/agent-authorisation'
+import { mergeBusinessPayloads } from '@/lib/hmrc-businesses'
 
 function firstValue(obj:any,keys:string[]){for(const key of keys){const value=obj?.[key];if(value!==undefined&&value!==null&&value!=='')return value}return null}
 function throwIfError(error:any,context:string){if(error)throw new Error(`${context}: ${error.message||JSON.stringify(error)}`)}
@@ -61,8 +62,14 @@ export async function POST(req:Request){
     const {error:taxpayerError}=await db.from('taxpayers').upsert({id:taxpayerId,display_name:taxpayerId==='demo'?'HMRC Sandbox Taxpayer':taxpayerId,nino,mtditid,updated_at:new Date().toISOString()})
     throwIfError(taxpayerError,'Taxpayer update failed')
 
-    const businesses=await hmrcGet(`/individuals/business/details/${encodeURIComponent(nino)}/list`,accessToken,hmrcAcceptHeader('businessDetails'))
-    const list=Array.isArray(businesses?.listOfBusinesses)?businesses.listOfBusinesses:[]
+    const businessPath=`/individuals/business/details/${encodeURIComponent(nino)}/list`
+    const businessAccept=hmrcAcceptHeader('businessDetails')
+    const businessPayloads:any[]=[]
+    if(process.env.HMRC_ENVIRONMENT!=='production'){
+      try{businessPayloads.push(await hmrcGet(businessPath,accessToken,businessAccept,'STATEFUL'))}catch{}
+    }
+    businessPayloads.push(await hmrcGet(businessPath,accessToken,businessAccept,'DEFAULT'))
+    const list=mergeBusinessPayloads(businessPayloads)
     const {error:deleteBusinessesError}=await db.from('hmrc_businesses').delete().eq('taxpayer_id',taxpayerId)
     throwIfError(deleteBusinessesError,'Deleting existing businesses failed')
     if(list.length){const {error}=await db.from('hmrc_businesses').insert(list.map((b:any)=>({taxpayer_id:taxpayerId,business_id:b.incomeSourceId||b.businessId,business_type:b.incomeSourceType||b.type,business_name:b.businessName||b.tradingName||b.incomeSourceName||null,raw:b})));throwIfError(error,'Saving businesses failed')}
