@@ -122,3 +122,13 @@ test('agent ASA OAuth state and callback are stored separately from taxpayer OAu
   assert.match(agentsPage,/Connect ASA/)
   assert.match(agentsPage,/agentId=\$\{encodeURIComponent\(r\.agent_id\)\}/)
 })
+
+test('HMRC test business creation is sandbox only and restricted to property types',()=>{
+  const source=readFileSync('app/api/hmrc/test-support/business/route.ts','utf8')
+  assert.match(source,/process\.env\.HMRC_ENVIRONMENT==='production'/)
+  assert.match(source,/new Set\(\['uk-property','foreign-property'\]\)/)
+  assert.match(source,/individuals\/self-assessment-test-support\/business\/\$\{encodeURIComponent\(taxpayer\.nino\)\}/)
+  assert.match(source,/Accept:'application\/vnd\.hmrc\.1\.0\+json'/)
+  assert.match(source,/getValidHmrcAccessToken\(taxpayerId\)/)
+  assert.match(source,/JSON\.stringify\(\{typeOfBusiness:businessType\}\)/)
+})
