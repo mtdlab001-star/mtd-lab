@@ -117,11 +117,13 @@ export default async function QuarterlyPage({params,searchParams}:{params:Promis
   const property=sourceType!=='self-employment'
   const rows=(obligations||[]).filter((o:any)=>!selectedBusiness||!o.business_id||o.business_id===selectedBusiness)
   const selectedPeriodEnd=qs.periodEnd||''
-  const selectedObligation=rows.find((o:any)=>o.period_end===selectedPeriodEnd&&String(o.status).toLowerCase()==='open')
+  const latestSubmission=(periodEnd:string)=>(submissions||[]).find((s:any)=>s.business_id===selectedBusiness&&s.period_end===periodEnd&&s.status==='submitted')
+  const selectedObligation=!latestSubmission(selectedPeriodEnd)
+    ? rows.find((o:any)=>o.period_end===selectedPeriodEnd&&String(o.status).toLowerCase()==='open')
+    : null
   const {data:digitalRecords}=selectedObligation&&selectedBusiness
     ? await db.from('mtd_digital_records').select('*').eq('taxpayer_id',id).eq('business_id',selectedBusiness).lte('transaction_date',selectedObligation.period_end).order('transaction_date')
     : ({data:[]} as any)
-  const latestSubmission=(periodEnd:string)=>(submissions||[]).find((s:any)=>s.business_id===selectedBusiness&&s.period_end===periodEnd&&s.status==='submitted')
   const quarterRows=rows.map((o:any,index:number)=>({o,quarter:index+1,submission:latestSubmission(o.period_end)}))
   const acceptedPending=quarterRows.filter((x:any)=>String(x.o.status).toLowerCase()!=='fulfilled'&&x.submission?.status==='submitted').length
   const totals:any=selectedObligation?cumulative(digitalRecords||[],selectedBusiness,selectedObligation.period_end,sourceType):null
@@ -149,6 +151,7 @@ export default async function QuarterlyPage({params,searchParams}:{params:Promis
       </section>
 
       {acceptedPending>0&&<div className="status">{acceptedPending} quarterly update{acceptedPending===1?' has':'s have'} been accepted by HMRC but the corresponding obligation is still open. Use Retrieve Obligations to refresh HMRC status. The accepted submission remains recorded in Submission History.</div>}
+      {qs.error&&<div className="status statusError"><strong>Quarterly submission is blocked.</strong><div>{qs.error}</div></div>}
 
       <section className="panel">
         <div className="detailGrid" style={{marginBottom:16}}><div><span className="eyebrow">Selected income source</span><strong>{sourceLabel}</strong>{selectedSource?.fallback&&<div className="muted">Identified from HMRC obligations</div>}</div><div><span className="eyebrow">Business ID</span><strong className="mono">{selectedBusiness||'Not selected'}</strong></div></div>

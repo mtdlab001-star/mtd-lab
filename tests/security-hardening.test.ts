@@ -109,6 +109,20 @@ test('delegated HMRC filing uses the authorised agent ASA connection',()=>{
   }
 })
 
+test('quarterly submissions recheck eligibility and prevent duplicate transmission',()=>{
+  const page=readFileSync('app/taxpayers/[id]/quarterly/page.tsx','utf8')
+  const prepareRoute=readFileSync('app/api/hmrc/quarterly/prepare/route.ts','utf8')
+  const submitRoute=readFileSync('app/api/hmrc/quarterly/submit/route.ts','utf8')
+  const migration=readFileSync('supabase/migrations/012_prevent_duplicate_quarterly_submissions.sql','utf8')
+
+  assert.match(page,/!latestSubmission\(selectedPeriodEnd\)/)
+  assert.match(prepareRoute,/quarterlySubmissionEligibility/)
+  assert.match(submitRoute,/quarterlySubmissionEligibility/)
+  assert.match(submitRoute,/auditError\?\.code==='23505'/)
+  assert.match(migration,/create unique index if not exists idx_hmrc_quarterly_submissions_one_active_period/)
+  assert.match(migration,/where status in \('sending','submitted'\)/)
+})
+
 test('agent ASA OAuth state and callback are stored separately from taxpayer OAuth',()=>{
   const state=readFileSync('lib/oauth-state.ts','utf8')
   const start=readFileSync('app/api/hmrc/oauth/start/route.ts','utf8')
