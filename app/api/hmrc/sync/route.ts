@@ -5,7 +5,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 import { isSameOriginRequest } from '@/lib/request-security'
 import { resolveConnectedAgentForPermission } from '@/lib/agent-authorisation'
-import { mergeBusinessPayloads } from '@/lib/hmrc-businesses'
+import { hmrcBusinessType, mergeBusinessPayloads } from '@/lib/hmrc-businesses'
 
 function firstValue(obj:any,keys:string[]){for(const key of keys){const value=obj?.[key];if(value!==undefined&&value!==null&&value!=='')return value}return null}
 function throwIfError(error:any,context:string){if(error)throw new Error(`${context}: ${error.message||JSON.stringify(error)}`)}
@@ -72,7 +72,7 @@ export async function POST(req:Request){
     const list=mergeBusinessPayloads(businessPayloads)
     const {error:deleteBusinessesError}=await db.from('hmrc_businesses').delete().eq('taxpayer_id',taxpayerId)
     throwIfError(deleteBusinessesError,'Deleting existing businesses failed')
-    if(list.length){const {error}=await db.from('hmrc_businesses').insert(list.map((b:any)=>({taxpayer_id:taxpayerId,business_id:b.incomeSourceId||b.businessId,business_type:b.incomeSourceType||b.type,business_name:b.businessName||b.tradingName||b.incomeSourceName||null,raw:b})));throwIfError(error,'Saving businesses failed')}
+    if(list.length){const {error}=await db.from('hmrc_businesses').insert(list.map((b:any)=>({taxpayer_id:taxpayerId,business_id:b.incomeSourceId||b.businessId,business_type:hmrcBusinessType(b),business_name:b.businessName||b.tradingName||b.incomeSourceName||null,raw:b})));throwIfError(error,'Saving businesses failed')}
 
     const {fromDate,toDate}=currentUkTaxYearRange()
     const currentPath=`/obligations/details/${encodeURIComponent(nino)}/income-and-expenditure?fromDate=${fromDate}&toDate=${toDate}`

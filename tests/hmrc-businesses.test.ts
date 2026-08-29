@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { mergeBusinessPayloads } from '../lib/hmrc-businesses.ts'
+import { hmrcBusinessType, mergeBusinessPayloads } from '../lib/hmrc-businesses.ts'
 
 test('combines stateful sandbox businesses with the default source and removes duplicates',()=>{
   const stateful={listOfBusinesses:[
@@ -20,4 +20,9 @@ test('combines stateful sandbox businesses with the default source and removes d
     'XBIS12345678901',
   ])
   assert.equal(businesses[0].tradingName,undefined)
+})
+
+test('reads the Business Details v2 typeOfBusiness field',()=>{
+  assert.equal(hmrcBusinessType({typeOfBusiness:'uk-property'}),'uk-property')
+  assert.equal(hmrcBusinessType({typeOfBusiness:'foreign-property'}),'foreign-property')
 })
