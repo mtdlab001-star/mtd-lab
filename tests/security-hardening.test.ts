@@ -100,7 +100,10 @@ test('delegated HMRC filing uses the authorised agent ASA connection',()=>{
   const triggerRoute=readFileSync('app/api/hmrc/calculations/trigger/route.ts','utf8')
   const retrieveRoute=readFileSync('app/api/hmrc/calculations/retrieve/route.ts','utf8')
 
-  for(const source of [quarterlyRoute,finalRoute,triggerRoute,retrieveRoute]){
+  assert.match(quarterlyRoute,/resolveConnectedAgentForPermission\(taxpayerId,'can_submit_quarterly',requestedAgentId\)/)
+  assert.match(quarterlyRoute,/getHmrcAccessTokenForActingCapacity\(taxpayerId,actingAgentId\)/)
+
+  for(const source of [finalRoute,triggerRoute,retrieveRoute]){
     assert.match(source,/agentCan\(taxpayerId,actingAgentId,/)
     assert.match(source,/getHmrcAccessTokenForActingCapacity\(taxpayerId,actingAgentId\)/)
   }
