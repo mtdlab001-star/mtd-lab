@@ -6,15 +6,26 @@ import { buildFraudHeaders } from '@/lib/hmrc-fraud'
 import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 import { isSameOriginRequest } from '@/lib/request-security'
 import { agentCan } from '@/lib/agent-authorisation'
+import { yearEndFinalisationStatus } from '@/lib/year-end-finalisation'
 
 export async function POST(req:Request){
  if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const form=await req.formData();const taxpayerId=String(form.get('taxpayerId')||'demo');const taxYear=String(form.get('taxYear')||'');const calculationType=String(form.get('calculationType')||'in-year');const actingAgentId=String(form.get('actingAgentId')||'').trim()||null
- const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/calculations`,req.url);back.searchParams.set('taxYear',taxYear)
+ const backPath=calculationType==='intent-to-finalise'?`/taxpayers/${encodeURIComponent(taxpayerId)}/end-of-year`:`/taxpayers/${encodeURIComponent(taxpayerId)}/calculations`
+ const back=new URL(backPath,req.url);back.searchParams.set('taxYear',taxYear)
  if(!/^20\d{2}-\d{2}$/.test(taxYear)){back.searchParams.set('error','Select a valid HMRC tax year');return NextResponse.redirect(back,303)}
  if(!['in-year','intent-to-finalise','intent-to-amend'].includes(calculationType)){back.searchParams.set('error','Invalid HMRC calculation type');return NextResponse.redirect(back,303)}
  if(actingAgentId){const allowed=await agentCan(taxpayerId,actingAgentId,'can_submit_final_declaration');if(!allowed){back.searchParams.set('error','The selected agent is not currently authorised to manage HMRC calculations for this taxpayer.');return NextResponse.redirect(back,303)}}
  const db=supabaseAdmin();const {data:taxpayer}=await db.from('taxpayers').select('nino').eq('id',taxpayerId).maybeSingle();if(!taxpayer?.nino){back.searchParams.set('error','Taxpayer NINO is missing');return NextResponse.redirect(back,303)}
+ if(calculationType==='intent-to-finalise'){
+  const [{count:businessCount},{data:obligations},{data:reviews}]=await Promise.all([
+   db.from('hmrc_businesses').select('id',{count:'exact',head:true}).eq('taxpayer_id',taxpayerId),
+   db.from('hmrc_obligations').select('period_start,status').eq('taxpayer_id',taxpayerId).gte('period_start','2025-04-06'),
+   db.from('mtd_year_end_reviews').select('section,status').eq('taxpayer_id',taxpayerId).eq('tax_year',taxYear),
+  ])
+  const readiness=yearEndFinalisationStatus({taxYear,businessCount:businessCount||0,obligations:obligations||[],reviews:reviews||[]})
+  if(!readiness.canFinalise){back.searchParams.set('error',`Intent to finalise is blocked: ${readiness.blockers.join('. ')}.`);return NextResponse.redirect(back,303)}
+ }
  let token:string;try{token=await getHmrcAccessTokenForActingCapacity(taxpayerId,actingAgentId)}catch(e:any){back.searchParams.set('error',e.message||'HMRC connection is incomplete');return NextResponse.redirect(back,303)}
  const fraud=buildFraudHeaders(req,form,taxpayerId);if(fraud.missing.length){back.searchParams.set('error',`Missing HMRC fraud prevention data: ${fraud.missing.join(', ')}`);return NextResponse.redirect(back,303)}
  const endpoint=`/individuals/calculations/${encodeURIComponent(taxpayer.nino)}/self-assessment/${encodeURIComponent(taxYear)}/trigger/${encodeURIComponent(calculationType)}`
