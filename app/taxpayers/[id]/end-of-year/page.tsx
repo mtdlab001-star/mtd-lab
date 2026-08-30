@@ -2,11 +2,10 @@ import Link from 'next/link'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import FraudContextFields from '@/app/components/FraudContextFields'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { YEAR_END_REVIEW_SECTIONS, taxYearFromDate, yearEndFinalisationStatus } from '@/lib/year-end-finalisation'
 
 export const dynamic='force-dynamic'
 
-function taxYearFromDate(value:string){const [y,m,d]=value.split('-').map(Number);const start=m>4||(m===4&&d>=6)?y:y-1;return `${start}-${String(start+1).slice(-2)}`}
-function taxYearEnd(taxYear:string){const start=Number(taxYear.slice(0,4));return new Date(`${start+1}-04-05T23:59:59Z`)}
 function isProperty(b:any){const t=String(b.business_type||'').toLowerCase();const r=JSON.stringify(b.raw||{}).toLowerCase();return t.includes('property')||r.includes('property')}
 
 export default async function EndOfYearPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
@@ -21,19 +20,13 @@ export default async function EndOfYearPage({params,searchParams}:{params:Promis
  const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27')
  const {data:reviews}=await db.from('mtd_year_end_reviews').select('section,status,note,reviewed_at').eq('taxpayer_id',id).eq('tax_year',selected)
  const reviewMap=new Map((reviews||[]).map((r:any)=>[r.section,r]))
- const yearObligations=(obligations||[]).filter((o:any)=>taxYearFromDate(o.period_start)===selected)
- const open=yearObligations.filter((o:any)=>String(o.status).toLowerCase()==='open')
  const accepted=(submissions||[]).filter((s:any)=>s.tax_year===selected&&s.status==='submitted')
  const businessCount=(businesses||[]).length
  const hasProperty=(businesses||[]).some(isProperty)
- const ended=new Date()>taxYearEnd(selected)
- const quarterlyReady=yearObligations.length>0&&open.length===0
- const incomeSourcesReady=businessCount>0
  const acceptedReady=accepted.length>0
- const tracked=['adjustments','tax-liability','reliefs','other-income','state-benefits','employment']
- const reviewComplete=tracked.every(s=>['reviewed','not_applicable'].includes(String(reviewMap.get(s)?.status||'')))
- const canFinalise=ended&&incomeSourcesReady&&quarterlyReady&&reviewComplete
- const blockers=[!ended?'Tax year has not ended':null,!incomeSourcesReady?'No HMRC income sources found':null,!quarterlyReady?'Open quarterly obligations remain':null,!reviewComplete?'Year end schedules have not all been reviewed':null].filter(Boolean)
+ const tracked=[...YEAR_END_REVIEW_SECTIONS]
+ const readiness=yearEndFinalisationStatus({taxYear:selected,businessCount,obligations:obligations||[],reviews:reviews||[]})
+ const {canFinalise,blockers,incomeSourcesReady,quarterlyReady,reviewComplete,yearObligationCount,openCount,completedReviewCount}=readiness
  const statusInfo=(section:string)=>{const r:any=reviewMap.get(section);if(!r)return {label:'Not reviewed',cls:'statusOpen'};if(r.status==='reviewed')return {label:'Reviewed',cls:'statusDone'};if(r.status==='not_applicable')return {label:'Not applicable',cls:'statusDone'};return {label:'Action required',cls:'statusOpen'}}
  const reviewButtons=(section:string)=><form method="post" action="/api/year-end/review" style={{display:'flex',gap:6,flexWrap:'wrap'}}><input type="hidden" name="taxpayerId" value={id}/><input type="hidden" name="taxYear" value={selected}/><input type="hidden" name="section" value={section}/><button className="btn btnSmall" name="status" value="reviewed" type="submit">Mark reviewed</button><button className="btn btnSmall" name="status" value="not_applicable" type="submit">Not applicable</button><button className="btn btnSmall" name="status" value="action_required" type="submit">Needs action</button></form>
  return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="end-of-year"/><main className="main">
@@ -43,7 +36,7 @@ export default async function EndOfYearPage({params,searchParams}:{params:Promis
   {qs.reviewSaved&&<div className="status"><strong>Year end review status updated.</strong><div className="muted">Section: {qs.reviewSaved}</div></div>}
   {qs.triggered&&<div className="status"><strong>Intent to finalise calculation requested.</strong>{qs.calculationId&&<div>Calculation ID: <span className="mono">{qs.calculationId}</span></div>}<div className="muted">Retrieve the calculation from HMRC before proceeding to any Final Declaration.</div></div>}
   <section className="panel"><div className="sectionHead"><div><h2>Year end readiness</h2><p className="muted">MTD Lab combines HMRC data, submission history and explicit year end review status so finalisation cannot bypass unreviewed schedules.</p></div><form method="get"><select className="selectField" name="taxYear" defaultValue={selected}>{years.length?years.map(y=><option key={y} value={y}>{y}</option>):<option value={selected}>{selected}</option>}</select><button className="btn btnSmall" type="submit">View tax year</button></form></div>
-   <div className="cards"><div className="card"><span className="eyebrow">Income sources</span><strong>{incomeSourcesReady?'Ready':'Needs attention'}</strong><p className="muted">{businessCount} HMRC income source{businessCount===1?'':'s'} found{hasProperty?', including UK property':''}.</p></div><div className="card"><span className="eyebrow">Quarterly obligations</span><strong>{quarterlyReady?'Complete':`${open.length} open`}</strong><p className="muted">{yearObligations.length} modern obligation{yearObligations.length===1?'':'s'} retrieved for {selected}.</p></div><div className="card"><span className="eyebrow">Year end schedules</span><strong>{reviewComplete?'Reviewed':'Incomplete'}</strong><p className="muted">{tracked.filter(s=>['reviewed','not_applicable'].includes(String(reviewMap.get(s)?.status||''))).length} of {tracked.length} controlled schedules completed.</p></div><div className="card"><span className="eyebrow">Finalisation gate</span><strong>{canFinalise?'Ready':'Blocked'}</strong><p className="muted">{canFinalise?'Core year end conditions are satisfied.':blockers.join('. ')||'Review required.'}</p></div></div>
+   <div className="cards"><div className="card"><span className="eyebrow">Income sources</span><strong>{incomeSourcesReady?'Ready':'Needs attention'}</strong><p className="muted">{businessCount} HMRC income source{businessCount===1?'':'s'} found{hasProperty?', including UK property':''}.</p></div><div className="card"><span className="eyebrow">Quarterly obligations</span><strong>{quarterlyReady?'Complete':`${openCount} open`}</strong><p className="muted">{yearObligationCount} modern obligation{yearObligationCount===1?'':'s'} retrieved for {selected}.</p></div><div className="card"><span className="eyebrow">Year end schedules</span><strong>{reviewComplete?'Reviewed':'Incomplete'}</strong><p className="muted">{completedReviewCount} of {tracked.length} controlled schedules completed.</p></div><div className="card"><span className="eyebrow">Finalisation gate</span><strong>{canFinalise?'Ready':'Blocked'}</strong><p className="muted">{canFinalise?'Core year end conditions are satisfied.':blockers.join('. ')||'Review required.'}</p></div></div>
   </section>
   <section className="panel" style={{marginTop:16}}><h2>Completion checklist</h2><div className="tableWrap"><table><thead><tr><th>Step</th><th>Status</th><th>Open schedule</th><th>Review control</th></tr></thead><tbody>
    <tr><td>HMRC income sources retrieved</td><td><span className={`statusPill ${incomeSourcesReady?'statusDone':'statusOpen'}`}>{incomeSourcesReady?'Ready':'Action needed'}</span></td><td><Link className="btn btnSmall" href={`/taxpayers/${id}/businesses`}>Review businesses</Link></td><td>HMRC driven</td></tr>
