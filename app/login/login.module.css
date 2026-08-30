@@ -74,18 +74,6 @@
 .benefit:last-child{
   border-right:0;
 }
-.benefitIcon{
-  height:31px;
-  color:#1685ff;
-  font-size:25px;
-  line-height:1;
-}
-.benefit:nth-child(2) .benefitIcon{
-  color:#1f9cff;
-}
-.benefit:nth-child(3) .benefitIcon{
-  color:#8a17ff;
-}
 .benefit strong{
   display:block;
   margin:0 0 11px;

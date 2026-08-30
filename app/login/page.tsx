@@ -8,9 +8,9 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<Rec
       <section className={s.hero} aria-label="MTD Lab introduction">
         <img className={s.logo} src="/mtd-lab-logo-exact.webp" alt="MTD Lab, Making Tax Digital for Income Tax"/>
         <div className={s.benefits}>
-          <div className={s.benefit}><div className={s.benefitIcon}>♢</div><strong>Secure</strong><span>Your data is protected with enterprise-grade security.</span></div>
-          <div className={s.benefit}><div className={s.benefitIcon}>☁</div><strong>Compliant</strong><span>Built in line with HMRC Making Tax Digital requirements.</span></div>
-          <div className={s.benefit}><div className={s.benefitIcon}>◴</div><strong>Efficient</strong><span>Simplify your Income Tax reporting and save valuable time.</span></div>
+          <div className={s.benefit}><strong>Secure</strong><span>Your data is protected with enterprise-grade security.</span></div>
+          <div className={s.benefit}><strong>Compliant</strong><span>Built in line with HMRC Making Tax Digital requirements.</span></div>
+          <div className={s.benefit}><strong>Efficient</strong><span>Simplify your Income Tax reporting and save valuable time.</span></div>
         </div>
       </section>
       <section className={s.panel}>
