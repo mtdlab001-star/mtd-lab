@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import { incomeSourceType, incomeSourceTypeFromBusinessId, type MtdIncomeSourceType } from '@/lib/mtd-income-source'
+import { quarterlyPeriodIsAvailable } from '@/lib/quarterly-submission-eligibility'
 
 export const dynamic='force-dynamic'
 
@@ -46,7 +47,7 @@ export default async function SubmissionCentre({params,searchParams}:{params:Pro
  const selectedBusinessId=qs.businessId||matchingSources[0]?.business_id||''
  const selectedBusiness=matchingSources.find(source=>source.business_id===selectedBusinessId)||matchingSources[0]
  const businessPeriods=(obligations||[]).filter((o:any)=>!o.business_id||o.business_id===selectedBusiness?.business_id)
- const openPeriods=businessPeriods.filter((o:any)=>String(o.status).toLowerCase()==='open')
+ const openPeriods=businessPeriods.filter((o:any)=>String(o.status).toLowerCase()==='open'&&quarterlyPeriodIsAvailable(String(o.period_end||'')))
  const selectedPeriodEnd=qs.periodEnd||openPeriods[0]?.period_end||''
  const selectedPeriod=openPeriods.find((o:any)=>o.period_end===selectedPeriodEnd)||openPeriods[0]
  const quarterNumber=(o:any)=>Math.max(1,businessPeriods.findIndex((p:any)=>p.id===o.id)+1)

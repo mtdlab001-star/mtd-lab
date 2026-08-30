@@ -9,6 +9,7 @@ type EligibilityInput={
   business?:any|null
   obligations?:any[]|null
   submissions?:any[]|null
+  currentDate?:string
 }
 
 export type QuarterlyEligibility=
@@ -19,6 +20,10 @@ export function normaliseQuarterlySourceType(value:string):QuarterlySourceType|n
   if(value==='property')return 'uk-property'
   if(value==='self-employment'||value==='uk-property'||value==='foreign-property')return value
   return null
+}
+
+export function quarterlyPeriodIsAvailable(periodEnd:string,currentDate=new Date().toISOString().slice(0,10)){
+  return Boolean(periodEnd&&/^\d{4}-\d{2}-\d{2}$/.test(periodEnd)&&periodEnd<=currentDate)
 }
 
 function storedBusinessSourceType(business:any):QuarterlySourceType{
@@ -41,6 +46,10 @@ export function quarterlySubmissionEligibility(input:EligibilityInput):Quarterly
 
   if(businessMatches&&storedBusinessSourceType(input.business)!==sourceType){
     return {ok:false,error:'The selected income source type does not match the HMRC business'}
+  }
+
+  if(!quarterlyPeriodIsAvailable(input.periodEnd,input.currentDate)){
+    return {ok:false,error:`This quarterly update cannot be submitted before the period ends on ${input.periodEnd}`}
   }
 
   const duplicate=submissions.some((s:any)=>{
