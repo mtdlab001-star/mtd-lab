@@ -1,14 +1,16 @@
 function sumAmounts(value:unknown){
+ if(typeof value==='number')return Number.isFinite(value)?value:0
  if(!value||typeof value!=='object')return 0
- return Object.values(value).reduce((total,amount)=>total+(typeof amount==='number'&&Number.isFinite(amount)?amount:0),0)
+ return Object.values(value).reduce((total,amount)=>total+sumAmounts(amount),0)
 }
 
 export function quarterlyFinancials(row:any){
  const outer=row?.payload||row?.request_payload||row?.raw||{}
  const payload=outer.payload||outer
- const property=payload.foreignProperty||payload.ukProperty
- const income=property?sumAmounts(property.income):sumAmounts(payload.periodIncome)
- const expenses=property?sumAmounts(property.expenses):sumAmounts(payload.periodExpenses)
+ const propertyValue=payload.foreignProperty||payload.ukProperty
+ const properties=propertyValue?(Array.isArray(propertyValue)?propertyValue:[propertyValue]):[]
+ const income=properties.length?properties.reduce((total:number,property:any)=>total+sumAmounts(property?.income),0):sumAmounts(payload.periodIncome)
+ const expenses=properties.length?properties.reduce((total:number,property:any)=>total+sumAmounts(property?.expenses),0):sumAmounts(payload.periodExpenses)
  return {income,expenses,net:income-expenses}
 }
 

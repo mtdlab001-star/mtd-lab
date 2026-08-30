@@ -34,3 +34,13 @@ test('calculates property totals from the property payload',()=>{
  const property={request_payload:{payload:{ukProperty:{income:{premiumsOfLeaseGrant:400,rentIncome:900},expenses:{premisesRunningCosts:250,other:50}}}}}
  assert.deepEqual(quarterlyFinancials(property),{income:1300,expenses:300,net:1000})
 })
+
+test('calculates UK property totals from the accepted cumulative payload',()=>{
+ const property={request_payload:{incomeSourceType:'uk-property',payload:{ukProperty:{income:{premiumsOfLeaseGrant:0,reversePremiums:0,periodAmount:1000,taxDeducted:0,otherIncome:100,rentARoom:{rentsReceived:0}},expenses:{premisesRunningCosts:100,repairsAndMaintenance:0,financialCosts:0,professionalFees:150,costOfServices:0,other:350,residentialFinancialCost:0,travelCosts:0,residentialFinancialCostsCarriedForward:0,rentARoom:{amountClaimed:0}}}}}}
+ assert.deepEqual(quarterlyFinancials(property),{income:1100,expenses:600,net:500})
+})
+
+test('calculates foreign property totals from its array and nested rent amount',()=>{
+ const property={request_payload:{incomeSourceType:'foreign-property',payload:{foreignProperty:[{propertyId:'X9IS48219595807',income:{rentIncome:{rentAmount:1000},foreignTaxCreditRelief:false,premiumsOfLeaseGrant:0,otherPropertyIncome:100},expenses:{consolidatedExpenses:600}}]}}}
+ assert.deepEqual(quarterlyFinancials(property),{income:1100,expenses:600,net:500})
+})
