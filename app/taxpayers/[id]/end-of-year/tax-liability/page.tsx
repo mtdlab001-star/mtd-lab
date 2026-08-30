@@ -1,8 +1,9 @@
 import Link from 'next/link'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import FraudContextFields from '@/app/components/FraudContextFields'
+import HmrcAttemptStatus from '@/app/components/HmrcAttemptStatus'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { latestHmrcResponse } from '@/lib/hmrc-response-audit'
+import { latestHmrcAttempt, latestHmrcResponse } from '@/lib/hmrc-response-audit'
 
 export const dynamic='force-dynamic'
 
@@ -31,6 +32,7 @@ export default async function TaxLiabilityPage({params,searchParams}:{params:Pro
  const years=Array.from(new Set((obligations||[]).map((o:any)=>{const y=Number(String(o.period_start).slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse()
  const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27')
  const stored=await latestHmrcResponse(db,{taxpayerId:id,taxYear:selected,eventType:'tax_liability_retrieval'})
+ const latestAttempt=await latestHmrcAttempt(db,{taxpayerId:id,taxYear:selected,eventType:'tax_liability_retrieval'})
  const result:any=stored?.response_summary||stored?.response_payload||null
  const yearEnded=ended(selected)
 
@@ -68,6 +70,7 @@ export default async function TaxLiabilityPage({params,searchParams}:{params:Pro
     <input type="hidden" name="taxYear" value={selected}/>
     <button className="btn btnSmall" type="submit">Retrieve from HMRC</button>
    </form>
+   {!qs.error&&<HmrcAttemptStatus attempt={latestAttempt} label="Tax liability adjustments"/>}
 
    {qs.retrieved&&result&&<div style={{marginTop:18}}>
     <div className="cards">

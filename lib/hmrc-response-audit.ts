@@ -22,3 +22,17 @@ export async function latestHmrcResponse(db:any,args:{taxpayerId:string;taxYear:
   const row=requestKey?rows.find((r:any)=>String(r?.request_summary?.[requestKey]||'')===String(args.requestValue||'')):rows[0]
   return row||null
 }
+
+export async function latestHmrcAttempt(db:any,args:{taxpayerId:string;taxYear:string;eventType:string;requestKey?:string;requestValue?:string}){
+  const {data}=await db.from('mtd_submission_audit')
+    .select('id,status,hmrc_status,response_summary,response_payload,hmrc_correlation_id,created_at,request_summary')
+    .eq('taxpayer_id',args.taxpayerId)
+    .eq('tax_year',args.taxYear)
+    .eq('event_type',args.eventType)
+    .order('created_at',{ascending:false})
+    .limit(25)
+  const rows=data||[]
+  const requestKey=args.requestKey
+  const row=requestKey?rows.find((r:any)=>String(r?.request_summary?.[requestKey]||'')===String(args.requestValue||'')):rows[0]
+  return row||null
+}
