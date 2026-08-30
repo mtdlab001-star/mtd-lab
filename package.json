@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@supabase/supabase-js": "2.112.4",
+    "ai": "7.0.85",
     "exceljs": "4.4.0",
     "next": "15.5.24",
     "react": "19.1.0",
