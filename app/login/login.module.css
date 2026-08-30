@@ -163,11 +163,28 @@
   line-height:1;
   pointer-events:none;
 }
-.inputWrap .eye{
+.eyeButton{
+  position:absolute;
+  top:50%;
+  transform:translateY(-50%);
   left:auto;
   right:18px;
+  width:36px;
+  height:36px;
+  padding:0;
+  border:0;
+  border-radius:50%;
+  background:transparent;
   color:#b5bfd3;
   font-size:23px;
+  line-height:1;
+  cursor:pointer;
+}
+.eyeButton:hover,
+.eyeButton:focus-visible{
+  color:#fff;
+  background:rgba(46,119,255,.18);
+  outline:2px solid transparent;
 }
 .field{
   width:100%;

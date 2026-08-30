@@ -1,4 +1,5 @@
 import s from './login.module.css'
+import PasswordField from './PasswordField'
 
 export default async function LoginPage({searchParams}:{searchParams:Promise<Record<string,string|undefined>>}){
   const qs=await searchParams
@@ -19,7 +20,7 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<Rec
           <form className={s.form} method="post" action="/api/auth/login">
             <input type="hidden" name="next" value={qs.next||''}/>
             <div><label htmlFor="username">Username</label><div className={s.inputWrap}><span aria-hidden="true">♙</span><input id="username" name="username" className={s.field} autoComplete="username" required placeholder="Enter your username"/></div></div>
-            <div><label htmlFor="password">Password</label><div className={s.inputWrap}><span aria-hidden="true">▣</span><input id="password" name="password" className={s.field} type="password" autoComplete="current-password" required placeholder="Enter your password"/><span className={s.eye} aria-hidden="true">◉</span></div></div>
+            <PasswordField/>
             <div className={s.options}><label><input type="checkbox" name="remember"/> Remember me</label><a href="#help">Forgot password?</a></div>
             <button className={s.button} type="submit">▣ &nbsp; Sign In</button>
           </form>
