@@ -6,6 +6,7 @@ import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 import { isSameOriginRequest } from '@/lib/request-security'
 import { resolveConnectedAgentForPermission } from '@/lib/agent-authorisation'
 import { hmrcBusinessType, mergeBusinessPayloads } from '@/lib/hmrc-businesses'
+import { reconcileSandboxObligationBusinessIds } from '@/lib/hmrc-obligations'
 
 function firstValue(obj:any,keys:string[]){for(const key of keys){const value=obj?.[key];if(value!==undefined&&value!==null&&value!=='')return value}return null}
 function throwIfError(error:any,context:string){if(error)throw new Error(`${context}: ${error.message||JSON.stringify(error)}`)}
@@ -99,7 +100,8 @@ export async function POST(req:Request){
       all=flattenObligations(obligations)
     }
 
-    const uniqueObligations=dedupeObligations(all)
+    const reconciledObligations=reconcileSandboxObligationBusinessIds(all,list,process.env.HMRC_ENVIRONMENT)
+    const uniqueObligations=dedupeObligations(reconciledObligations)
     const {error:deleteObligationsError}=await db.from('hmrc_obligations').delete().eq('taxpayer_id',taxpayerId)
     throwIfError(deleteObligationsError,'Deleting existing obligations failed')
     if(uniqueObligations.length){const rows=uniqueObligations.map((o:any)=>({taxpayer_id:taxpayerId,business_id:o.businessId,period_start:firstValue(o,['periodStartDate','inboundCorrespondenceFrom','start','PeriodStartDate']),period_end:firstValue(o,['periodEndDate','inboundCorrespondenceTo','end','PeriodEndDate']),due_date:firstValue(o,['dueDate','inboundCorrespondenceDueDate','due','DueDate']),status:firstValue(o,['status','Status']),received_date:firstValue(o,['receivedDate','inboundCorrespondenceDateReceived','inboundCorrespondenceReceivedDate','received','ReceivedDate']),raw:o}));const {error}=await db.from('hmrc_obligations').insert(rows);throwIfError(error,'Saving obligations failed')}
