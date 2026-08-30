@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import { incomeSourceTypeFromBusinessId, type MtdIncomeSourceType } from '@/lib/mtd-income-source'
+import { quarterlyFinancials } from '@/lib/submission-evidence'
 
 export const dynamic='force-dynamic'
 function fmt(value?:string|null){if(!value)return 'Not available';return new Date(value).toLocaleString('en-GB')}
@@ -10,7 +11,7 @@ function sourceType(r:any):MtdIncomeSourceType{const raw=JSON.stringify(r.payloa
 function sourceLabel(type:MtdIncomeSourceType){if(type==='foreign-property')return 'Foreign Property';if(type==='uk-property')return 'UK Property';return 'Self Assessment'}
 function money(v:any){const n=Number(v);return Number.isFinite(n)?n.toLocaleString('en-GB',{style:'currency',currency:'GBP'}):'Not available'}
 function signed(v:number){return `${v>=0?'+':''}${money(v)}`}
-function totals(r:any){const outer=r.payload||r.request_payload||r.raw||{};const p=outer.payload||outer;const property=p.foreignProperty||p.ukProperty;if(property){const i=property.income||{},e=property.expenses||{};return {income:Object.values(i).reduce((a:any,v:any)=>a+(typeof v==='number'?v:0),0) as number,expenses:Object.values(e).reduce((a:any,v:any)=>a+(typeof v==='number'?v:0),0) as number}}const i=p.periodIncome||{},e=p.periodExpenses||{};return {income:Object.values(i).reduce((a:any,v:any)=>a+(typeof v==='number'?v:0),0) as number,expenses:Object.values(e).reduce((a:any,v:any)=>a+(typeof v==='number'?v:0),0) as number}}
+function totals(r:any){return quarterlyFinancials(r)}
 function obligationFor(row:any,obligations:any[]){return obligations.find(o=>String(o.business_id||'')===String(row.business_id||'')&&String(o.period_end||'')===String(row.period_end||''))||obligations.find(o=>String(o.period_end||'')===String(row.period_end||''))}
 function reconciliation(row:any,obligations:any[]){if(row.status!=='submitted')return {label:'Needs attention',detail:'HMRC did not accept this submission attempt.',done:false};const obligation=obligationFor(row,obligations);const status=String(obligation?.status||'').toLowerCase();if(['fulfilled','met','complete','completed'].includes(status))return {label:'Obligation fulfilled',detail:'HMRC now reports the matching obligation as fulfilled.',done:true};const sentAt=new Date(row.submitted_at||row.created_at).getTime();const elapsed=Number.isFinite(sentAt)?Date.now()-sentAt:0;if(elapsed<60*60*1000)return {label:'Accepted, awaiting HMRC update',detail:'HMRC accepted the update. Obligation status can take time to refresh.',done:true};return {label:'Accepted, obligation still open',detail:'The submission was accepted, but the latest stored HMRC obligation has not yet changed to fulfilled. Refresh HMRC data before taking further action.',done:true}}
 
