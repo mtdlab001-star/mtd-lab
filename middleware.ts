@@ -21,6 +21,8 @@ const publicAssets=new Set([
   '/mtd-lab-logo.svg',
 ])
 
+const publicPages=new Set(['/login','/help'])
+
 function secure(res:NextResponse){
   for(const [key,value] of securityHeaders)res.headers.set(key,value)
   return res
@@ -28,7 +30,7 @@ function secure(res:NextResponse){
 
 export async function middleware(req:NextRequest){
   const path=req.nextUrl.pathname
-  if(path==='/login'||publicAssets.has(path)||path.startsWith('/api/auth/')||path.startsWith('/_next/')) return secure(NextResponse.next())
+  if(publicPages.has(path)||publicAssets.has(path)||path.startsWith('/api/auth/')||path.startsWith('/_next/')) return secure(NextResponse.next())
   const valid=await verifyAppSession(req.cookies.get('mtdlab_session')?.value)
   if(valid) return secure(NextResponse.next())
   const login=req.nextUrl.clone()
