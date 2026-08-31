@@ -20,7 +20,7 @@ export default async function ResetPasswordPage({searchParams}:{searchParams:Pro
           {success
             ? <>
                 <h1>Password reset <span>complete</span></h1>
-                <p className={s.subtitle}>Your password has been updated. Existing MTD Lab sessions using the previous credential are no longer valid.</p>
+                <p className={s.subtitle}>Your password has been updated. Existing MTD Lab sessions using the previous credential are no longer valid. A security confirmation email will be sent to the registered contact address.</p>
                 <div className={s.help}><div className={s.helpIcon}>✓</div><div><strong>You can sign in now</strong><p>Use your username and the new password on the sign in page.</p><a href="/login">Back to sign in <span aria-hidden="true">→</span></a></div></div>
               </>
             : <>
