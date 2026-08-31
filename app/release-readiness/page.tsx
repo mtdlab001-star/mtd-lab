@@ -12,7 +12,11 @@ function submissionType(row:any):MtdIncomeSourceType{const raw=JSON.stringify(ro
 function taxYearEnded(taxYear:string){const start=Number(taxYear.slice(0,4));return Number.isFinite(start)&&Date.now()>=Date.UTC(start+1,3,6)}
 
 export default async function ReleaseReadinessPage(){
- const db=supabaseAdmin();try{await expireAgentAuthorisations()}catch{}
+ const db=(()=>{try{return supabaseAdmin()}catch{return null}})()
+ if(!db){
+  return <div className="shell"><aside className="side"><div className="brand"><img className="brandLogo" src="/mtd-lab-logo-post-login.svg" alt="MTD Lab"/></div><div className="nav"><Link href="/">Dashboard</Link><Link href="/taxpayers">Taxpayers</Link><Link href="/agents">Agents</Link><Link href="/taxpayers/sandbox">Sandbox setup</Link><span>Release readiness</span></div><div className="operator">Operated by Glomaxel IT Service</div></aside><main className="main"><div className="top"><div><h1 className="pageTitle">Stage 2 release readiness</h1><p className="muted">Controlled evidence gate before any production MTD Income Tax submission capability is enabled.</p></div><span className="statusPill statusOpen">Configuration needed</span></div><div className="status statusError" style={{marginTop:16}}><strong>Release evidence cannot be loaded.</strong><div>Check the Vercel Supabase server environment variables, then redeploy the app.</div></div><section className="panel" style={{marginTop:16}}><h2>Required configuration</h2><p className="muted">Production needs the Supabase URL and service role key before MTD Lab can read taxpayers, agents, obligations and submission evidence.</p></section></main></div>
+ }
+ try{await expireAgentAuthorisations()}catch{}
  const [taxpayers,connections,syncs,quarterly,obligations,calculations,finals,directFinals,agentFinals,activeQuarterlyAgentAuths,loginAttempts,digitalRecords,yearEndReviews,evidenceBucket]=await Promise.all([
   db.from('taxpayers').select('id,display_name,nino').is('archived_at',null).order('display_name'),
   db.from('hmrc_connections').select('access_token,refresh_token,token_expires_at,scope'),
