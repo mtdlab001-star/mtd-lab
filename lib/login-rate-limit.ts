@@ -19,6 +19,10 @@ function rateLimitSecret() {
   return process.env.LOGIN_RATE_LIMIT_SECRET || process.env.MTD_SESSION_SECRET || ''
 }
 
+function hasAuditStorage() {
+  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+}
+
 function clientIp(req: Request) {
   const forwarded = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
   return forwarded || req.headers.get('x-real-ip') || req.headers.get('cf-connecting-ip') || 'unknown'
@@ -66,7 +70,7 @@ async function countFailedAttempts(ipHash: string, usernameHash: string) {
 }
 
 export async function assessLoginRateLimit(req: Request, username: string): Promise<RateLimitResult> {
-  if (!rateLimitSecret()) {
+  if (!rateLimitSecret() || !hasAuditStorage()) {
     return { ipHash: '', usernameHash: '', limited: true, retryAfterSeconds: 60 }
   }
 
@@ -87,7 +91,7 @@ export async function assessLoginRateLimit(req: Request, username: string): Prom
 }
 
 export async function recordLoginAttempt(req: Request, username: string, success: boolean, reason: string) {
-  if (!rateLimitSecret()) return
+  if (!rateLimitSecret() || !hasAuditStorage()) return
 
   try {
     const { ipHash, usernameHash } = await attemptIdentity(req, username)
@@ -106,6 +110,8 @@ export async function recordLoginAttempt(req: Request, username: string, success
 }
 
 export async function pruneLoginAttemptAudit() {
+  if (!hasAuditStorage()) return
+
   try {
     const before = new Date(Date.now() - RETENTION_DAYS * 24 * 60 * 60 * 1000).toISOString()
     const { error } = await supabaseAdmin().from('app_login_attempts').delete().lt('created_at', before)
