@@ -54,6 +54,8 @@ async function knownAccount(account:string){
   return false
 }
 
+function passwordEmailRecipient(){return configuredAppEmail()||process.env.PASSWORD_RESET_TO||''}
+
 async function countRecentResetRequests(ipHash:string,accountHash:string){
   const since=new Date(Date.now()-RESET_WINDOW_SECONDS*1000).toISOString()
   const db=supabaseAdmin()
@@ -78,26 +80,21 @@ async function recordResetAudit(req:Request,identity:ResetIdentity,event:string,
   if(error)throw error
 }
 
-async function sendResetEmail(account:string,resetUrl:string){
+async function sendPasswordEmail(to:string,subject:string,text:string,context:string){
   const apiKey=process.env.RESEND_API_KEY
   const from=process.env.PASSWORD_RESET_FROM
-  const to=configuredAppEmail()||process.env.PASSWORD_RESET_TO||(account.includes('@')?account:'')
   if(!apiKey||!from||!to)return 'email_not_configured'
 
   try{
     const response=await fetch('https://api.resend.com/emails',{
       method:'POST',
       headers:{Authorization:`Bearer ${apiKey}`,'Content-Type':'application/json'},
-      body:JSON.stringify({
-        from,
-        to,
-        subject:'Reset your MTD Lab password',
-        text:`A password reset was requested for MTD Lab. Use this secure link within ${RESET_TOKEN_MINUTES} minutes: ${resetUrl}\n\nIf you did not request this, ignore this message. MTD Lab will never ask you to reveal your password or HMRC credentials.`,
-      }),
+      body:JSON.stringify({from,to,subject,text}),
     })
     if(response.ok)return 'email_sent'
     const errorBody=await response.text().catch(()=>'')
     console.warn('Password reset email provider rejected request',{
+      context,
       status:response.status,
       statusText:response.statusText,
       body:errorBody.slice(0,500),
@@ -109,6 +106,26 @@ async function sendResetEmail(account:string,resetUrl:string){
     console.error('Password reset email failed',error)
     return 'email_failed'
   }
+}
+
+async function sendResetEmail(account:string,resetUrl:string){
+  const to=passwordEmailRecipient()||(account.includes('@')?account:'')
+  return sendPasswordEmail(
+    to,
+    'Reset your MTD Lab password',
+    `A password reset was requested for MTD Lab. Use this secure link within ${RESET_TOKEN_MINUTES} minutes: ${resetUrl}\n\nIf you did not request this, ignore this message. MTD Lab will never ask you to reveal your password or HMRC credentials.`,
+    'reset-link',
+  )
+}
+
+async function sendPasswordChangedEmail(){
+  const to=passwordEmailRecipient()
+  return sendPasswordEmail(
+    to,
+    'Your MTD Lab password was changed',
+    'Your MTD Lab password has just been changed. Existing sessions using the previous credential are no longer valid.\n\nIf you made this change, no further action is needed. If you did not make this change, contact the MTD Lab administrator immediately. MTD Lab will never ask you to reveal your password or HMRC credentials in chat.',
+    'password-changed',
+  )
 }
 
 export function passwordMeetsPolicy(password:string){
@@ -180,5 +197,7 @@ export async function resetPasswordWithToken(req:Request,token:string,password:s
   if(update.error)throw update.error
   await db.from('app_password_reset_tokens').update({used_at:now}).eq('account_hash',String(data.account_hash)).is('used_at',null)
   await recordResetAudit(req,{...identity,accountHash:String(data.account_hash)},'completed','not_sent')
+  const passwordChangedDeliveryStatus=await sendPasswordChangedEmail()
+  await recordResetAudit(req,{...identity,accountHash:String(data.account_hash)},'password_changed_notice',passwordChangedDeliveryStatus)
   return {ok:true,message:'Password reset complete.'}
 }
