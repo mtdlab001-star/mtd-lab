@@ -23,6 +23,10 @@ async function digest(value:string){
   return new Uint8Array(await crypto.subtle.digest('SHA-256',encoder.encode(value)))
 }
 
+function toArrayBuffer(bytes:Uint8Array){
+  return bytes.buffer.slice(bytes.byteOffset,bytes.byteOffset+bytes.byteLength) as ArrayBuffer
+}
+
 function bytesToBase64(bytes:Uint8Array){
   let binary=''
   for(const byte of bytes)binary+=String.fromCharCode(byte)
@@ -45,7 +49,7 @@ function constantTimeBytesEqual(actual:Uint8Array,expected:Uint8Array){
 
 async function derivePasswordHash(password:string,salt:Uint8Array,iterations:number){
   const keyMaterial=await crypto.subtle.importKey('raw',encoder.encode(password),{name:'PBKDF2'},false,['deriveBits'])
-  const derived=await crypto.subtle.deriveBits({name:'PBKDF2',salt,iterations,hash:'SHA-256'},keyMaterial,PASSWORD_HASH_BYTES*8)
+  const derived=await crypto.subtle.deriveBits({name:'PBKDF2',salt:toArrayBuffer(salt),iterations,hash:'SHA-256'},keyMaterial,PASSWORD_HASH_BYTES*8)
   return new Uint8Array(derived)
 }
 
