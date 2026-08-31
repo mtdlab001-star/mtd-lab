@@ -40,6 +40,7 @@ test('login rate limiting fails closed when its protection is unavailable',()=>{
   const config=readFileSync('lib/supabase-admin.ts','utf8')
   assert.match(source,/function hasAuditStorage\(\) \{/)
   assert.match(source,/supabaseServerConfig\(\)\.missing\.length === 0/)
+  assert.match(config,/DEFAULT_SUPABASE_URL = 'https:\/\/zpvfjabjqonnezqsztzp\.supabase\.co'/)
   assert.match(config,/NEXT_PUBLIC_SUPABASE_URL \|\| process\.env\.SUPABASE_URL/)
   assert.match(config,/SUPABASE_SERVICE_ROLE_KEY \|\| process\.env\.SUPABASE_SERVICE_KEY/)
   assert.match(config,/missing\.join\(', '\)/)

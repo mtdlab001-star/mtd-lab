@@ -1,7 +1,9 @@
 import { createClient } from '@supabase/supabase-js'
 
+const DEFAULT_SUPABASE_URL = 'https://zpvfjabjqonnezqsztzp.supabase.co'
+
 export function supabaseServerConfig() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || ''
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || DEFAULT_SUPABASE_URL
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SERVICE_KEY || ''
   const missing: string[] = []
   if (!url) missing.push('NEXT_PUBLIC_SUPABASE_URL or SUPABASE_URL')
