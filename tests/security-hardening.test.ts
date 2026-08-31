@@ -46,7 +46,7 @@ test('login rate limiting does not trap valid credentials behind stale failures'
   const limiter=readFileSync('lib/login-rate-limit.ts','utf8')
   assert.match(route,/const validUser=await constantTimeEqual\(username,expectedUser\)/)
   assert.match(route,/const validPassword=await constantTimeEqual\(password,expectedPassword\)/)
-  assert.match(route,/if\(rateLimit\.limited&&\(!rateLimit\.ipHash\|\|!rateLimit\.usernameHash\|\|!validUser\|\|!validPassword\)\)/)
+  assert.match(route,/if\(rateLimit\.limited&&\(!validUser\|\|!validPassword\)\)/)
   assert.match(limiter,/\.eq\('reason', 'invalid_credentials'\)\.eq\('ip_hash'/)
   assert.match(limiter,/\.eq\('reason', 'invalid_credentials'\)\.eq\('username_hash'/)
 })
