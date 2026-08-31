@@ -37,10 +37,29 @@ test('middleware only exempts explicitly known public assets',()=>{
 
 test('login rate limiting fails closed when its protection is unavailable',()=>{
   const source=readFileSync('lib/login-rate-limit.ts','utf8')
+  const config=readFileSync('lib/supabase-admin.ts','utf8')
   assert.match(source,/function hasAuditStorage\(\) \{/)
+  assert.match(source,/supabaseServerConfig\(\)\.missing\.length === 0/)
+  assert.match(config,/NEXT_PUBLIC_SUPABASE_URL \|\| process\.env\.SUPABASE_URL/)
+  assert.match(config,/SUPABASE_SERVICE_ROLE_KEY \|\| process\.env\.SUPABASE_SERVICE_KEY/)
+  assert.match(config,/missing\.join\(', '\)/)
   assert.match(source,/if \(!rateLimitSecret\(\) \|\| !hasAuditStorage\(\)\) \{\s*return \{ ipHash: '', usernameHash: '', limited: true,/s)
   assert.match(source,/if \(!rateLimitSecret\(\) \|\| !hasAuditStorage\(\)\) return/)
   assert.match(source,/catch \(error\) \{\s*console\.error\('Login rate limit check failed', error\)\s*return \{ ipHash: '', usernameHash: '', limited: true,/s)
+})
+
+test('taxpayer and agent pages surface Supabase configuration failures',()=>{
+  const taxpayers=readFileSync('app/taxpayers/page.tsx','utf8')
+  const agents=readFileSync('app/agents/page.tsx','utf8')
+  const taxpayerAgents=readFileSync('app/taxpayers/[id]/agents/page.tsx','utf8')
+
+  assert.match(taxpayers,/Taxpayer data is temporarily unavailable/)
+  assert.match(taxpayers,/error\?\.message/)
+  assert.match(taxpayers,/Taxpayer records cannot be loaded until database configuration is available/)
+  assert.match(agents,/Agent data is temporarily unavailable/)
+  assert.match(agents,/error\?\.message/)
+  assert.match(taxpayerAgents,/Agent authorisation data is temporarily unavailable/)
+  assert.match(taxpayerAgents,/error\?\.message/)
 })
 
 test('login rate limiting does not trap valid credentials behind stale failures',()=>{

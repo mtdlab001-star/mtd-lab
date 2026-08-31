@@ -12,7 +12,7 @@ export default async function AgentAuthorisationPage({params,searchParams}:{para
   let taxpayer:any=null
   let rows:any[]=[]
   let agentConnections:any[]=[]
-  let unavailable=false
+  let unavailable=''
   try{
     const db=supabaseAdmin();try{await expireAgentAuthorisations(id)}catch{}
     const [{data:taxpayerRow},{data:links},{data:connections}]=await Promise.all([
@@ -23,13 +23,13 @@ export default async function AgentAuthorisationPage({params,searchParams}:{para
     taxpayer=taxpayerRow
     rows=links||[]
     agentConnections=connections||[]
-  }catch{
-    unavailable=true
+  }catch(error:any){
+    unavailable=error?.message||'Database configuration is temporarily unavailable.'
   }
   const connectionByAgent=new Map((agentConnections||[]).map((c:any)=>[c.agent_id,c]))
   return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="agents"/><main className="main">
     <div className="top"><div><h1 className="pageTitle">Agent Authorisation</h1><p className="muted">Control which tax agent may act for {taxpayer?.display_name||'this taxpayer'} inside MTD Lab.</p></div><span className="badge">Scoped access</span></div>
-    {unavailable&&<div className="status statusError"><strong>Agent authorisation data is temporarily unavailable.</strong><div>Check the Vercel Supabase server environment variables, then redeploy the app.</div></div>}
+    {unavailable&&<div className="status statusError"><strong>Agent authorisation data is temporarily unavailable.</strong><div>{unavailable}</div></div>}
     {qs.error&&<div className="status statusError">{qs.error}</div>}{qs.saved&&<div className="status">Agent authorisation saved.</div>}{qs.revoked&&<div className="status">Agent authorisation revoked.</div>}{qs.agentConnected&&<div className="status"><strong>Agent ASA connection saved.</strong><div>The software connection is ready. HMRC client authority is checked separately below.</div></div>}
     {qs.hmrcRelationship==='active'&&<div className="status"><strong>HMRC client relationship active.</strong><div>HMRC confirms that the connected agent can act for this taxpayer for MTD Income Tax.</div></div>}
     {qs.hmrcRelationship==='inactive'&&<div className="status statusError"><strong>HMRC client relationship not active.</strong><div>Create an HMRC sandbox authorisation request below, or confirm the client has accepted the request.</div></div>}

@@ -1,4 +1,4 @@
-import { supabaseAdmin } from '@/lib/supabase-admin'
+import { supabaseAdmin, supabaseServerConfig } from '@/lib/supabase-admin'
 
 const WINDOW_SECONDS = 15 * 60
 const IP_FAILED_LIMIT = 8
@@ -20,7 +20,7 @@ function rateLimitSecret() {
 }
 
 function hasAuditStorage() {
-  return Boolean(process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.SUPABASE_SERVICE_ROLE_KEY)
+  return supabaseServerConfig().missing.length === 0
 }
 
 function clientIp(req: Request) {
