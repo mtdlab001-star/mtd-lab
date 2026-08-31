@@ -2,6 +2,7 @@
 
 import {useEffect,useRef,useState} from 'react'
 import {usePathname} from 'next/navigation'
+import {shouldShowAIHelp} from '@/lib/ai-help-visibility'
 import s from './ai-help-widget.module.css'
 
 type ChatMessage={
@@ -74,6 +75,8 @@ export default function AIHelpWidget(){
     }
   }
 
+  if(!shouldShowAIHelp(pathname))return null
+
   return <div className={s.widget}>
     {open?<section className={s.panel} role="dialog" aria-label="MTD Lab AI Help">
       <header className={s.header}>
@@ -111,4 +114,3 @@ export default function AIHelpWidget(){
     </button>
   </div>
 }
-
