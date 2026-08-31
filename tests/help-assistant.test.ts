@@ -26,9 +26,11 @@ test('fallback assistant keeps unknown questions within product scope',()=>{
   assert.match(answer,/Help Centre/i)
 })
 
-test('AI Help is hidden on the login page only',()=>{
+test('AI Help is hidden on public pre-login pages only',()=>{
   assert.equal(shouldShowAIHelp('/login'),false)
   assert.equal(shouldShowAIHelp('/login?next=%2Ftaxpayers'),false)
+  assert.equal(shouldShowAIHelp('/forgot-password'),false)
+  assert.equal(shouldShowAIHelp('/forgot-password?sent=1'),false)
   assert.equal(shouldShowAIHelp('/taxpayers'),true)
   assert.equal(shouldShowAIHelp('/help'),true)
 })
