@@ -10,6 +10,7 @@ type EligibilityInput={
   obligations?:any[]|null
   submissions?:any[]|null
   currentDate?:string
+  allowFuturePeriod?:boolean
 }
 
 export type QuarterlyEligibility=
@@ -48,7 +49,7 @@ export function quarterlySubmissionEligibility(input:EligibilityInput):Quarterly
     return {ok:false,error:'The selected income source type does not match the HMRC business'}
   }
 
-  if(!quarterlyPeriodIsAvailable(input.periodEnd,input.currentDate)){
+  if(!input.allowFuturePeriod&&!quarterlyPeriodIsAvailable(input.periodEnd,input.currentDate)){
     return {ok:false,error:`This quarterly update cannot be submitted before the period ends on ${input.periodEnd}`}
   }
 
