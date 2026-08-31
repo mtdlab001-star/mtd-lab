@@ -37,10 +37,10 @@ export async function POST(req: Request) {
     db.from('hmrc_quarterly_submissions').select('taxpayer_id,business_id,period_start,period_end,status').eq('taxpayer_id',taxpayerId).eq('business_id',businessId).eq('period_start',periodStart).eq('period_end',periodEnd).in('status',['sending','submitted'])
   ])
   if(businessResult.error||obligationResult.error||submissionResult.error){
-    back.searchParams.set('error','Quarterly submission checks are temporarily unavailable')
+    back.searchParams.set('error','Quarterly preparation checks are temporarily unavailable')
     return NextResponse.redirect(back,303)
   }
-  const eligibility=quarterlySubmissionEligibility({taxpayerId,businessId,periodStart,periodEnd,requestedType:incomeSourceType,business:businessResult.data,obligations:obligationResult.data,submissions:submissionResult.data})
+  const eligibility=quarterlySubmissionEligibility({taxpayerId,businessId,periodStart,periodEnd,requestedType:incomeSourceType,business:businessResult.data,obligations:obligationResult.data,submissions:submissionResult.data,allowFuturePeriod:true})
   if(!eligibility.ok){back.searchParams.set('error',eligibility.error);return NextResponse.redirect(back,303)}
   const payload:any={
     taxpayerId,
