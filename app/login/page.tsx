@@ -21,7 +21,7 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<Rec
             <input type="hidden" name="next" value={qs.next||''}/>
             <div><label htmlFor="username">Username</label><div className={s.inputWrap}><span aria-hidden="true">♙</span><input id="username" name="username" className={s.field} autoComplete="username" required placeholder="Enter your username"/></div></div>
             <PasswordField/>
-            <div className={s.options}><label><input type="checkbox" name="remember"/> Remember me</label><a href="/help#sign-in">Forgot password?</a></div>
+            <div className={s.options}><label><input type="checkbox" name="remember"/> Remember me</label><a href="/forgot-password">Forgot password?</a></div>
             <button className={s.button} type="submit">▣ &nbsp; Sign In</button>
           </form>
           {qs.error&&<div className={s.error}>{qs.error}</div>}
