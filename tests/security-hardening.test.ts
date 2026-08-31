@@ -41,6 +41,16 @@ test('login rate limiting fails closed when its protection is unavailable',()=>{
   assert.match(source,/catch \(error\) \{\s*console\.error\('Login rate limit check failed', error\)\s*return \{ ipHash: '', usernameHash: '', limited: true,/s)
 })
 
+test('login rate limiting does not trap valid credentials behind stale failures',()=>{
+  const route=readFileSync('app/api/auth/login/route.ts','utf8')
+  const limiter=readFileSync('lib/login-rate-limit.ts','utf8')
+  assert.match(route,/const validUser=await constantTimeEqual\(username,expectedUser\)/)
+  assert.match(route,/const validPassword=await constantTimeEqual\(password,expectedPassword\)/)
+  assert.match(route,/if\(rateLimit\.limited&&\(!rateLimit\.ipHash\|\|!rateLimit\.usernameHash\|\|!validUser\|\|!validPassword\)\)/)
+  assert.match(limiter,/\.eq\('reason', 'invalid_credentials'\)\.eq\('ip_hash'/)
+  assert.match(limiter,/\.eq\('reason', 'invalid_credentials'\)\.eq\('username_hash'/)
+})
+
 test('evidence uploads verify actual file signatures',()=>{
   const source=readFileSync('app/api/digital-records/evidence/upload/route.ts','utf8')
   assert.match(source,/matchesDeclaredType/)
