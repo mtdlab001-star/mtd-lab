@@ -21,14 +21,14 @@ export async function POST(req:Request){
     back.searchParams.set('error','Application login has not been configured yet.')
     return NextResponse.redirect(back,303)
   }
+  const validUser=await constantTimeEqual(username,expectedUser)
+  const validPassword=await constantTimeEqual(password,expectedPassword)
   const rateLimit=await assessLoginRateLimit(req,username)
-  if(rateLimit.limited){
+  if(rateLimit.limited&&(!rateLimit.ipHash||!rateLimit.usernameHash||!validUser||!validPassword)){
     await recordLoginAttempt(req,username,false,'rate_limited')
     back.searchParams.set('error','Too many sign in attempts. Wait a few minutes and try again.')
     return NextResponse.redirect(back,303)
   }
-  const validUser=await constantTimeEqual(username,expectedUser)
-  const validPassword=await constantTimeEqual(password,expectedPassword)
   if(!validUser||!validPassword){
     await recordLoginAttempt(req,username,false,'invalid_credentials')
     back.searchParams.set('error','Username or password is incorrect.')
