@@ -24,7 +24,7 @@ export async function POST(req:Request){
   const validUser=await constantTimeEqual(username,expectedUser)
   const validPassword=await constantTimeEqual(password,expectedPassword)
   const rateLimit=await assessLoginRateLimit(req,username)
-  if(rateLimit.limited&&(!rateLimit.ipHash||!rateLimit.usernameHash||!validUser||!validPassword)){
+  if(rateLimit.limited&&(!validUser||!validPassword)){
     await recordLoginAttempt(req,username,false,'rate_limited')
     back.searchParams.set('error','Too many sign in attempts. Wait a few minutes and try again.')
     return NextResponse.redirect(back,303)
