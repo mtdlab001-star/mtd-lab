@@ -95,7 +95,16 @@ async function sendResetEmail(account:string,resetUrl:string){
         text:`A password reset was requested for MTD Lab. Use this secure link within ${RESET_TOKEN_MINUTES} minutes: ${resetUrl}\n\nIf you did not request this, ignore this message. MTD Lab will never ask you to reveal your password or HMRC credentials.`,
       }),
     })
-    return response.ok?'email_sent':'email_failed'
+    if(response.ok)return 'email_sent'
+    const errorBody=await response.text().catch(()=>'')
+    console.warn('Password reset email provider rejected request',{
+      status:response.status,
+      statusText:response.statusText,
+      body:errorBody.slice(0,500),
+      hasFrom:Boolean(from),
+      hasTo:Boolean(to),
+    })
+    return `email_failed_${response.status}`
   }catch(error){
     console.error('Password reset email failed',error)
     return 'email_failed'
