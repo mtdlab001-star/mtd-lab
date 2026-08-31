@@ -1,6 +1,7 @@
 import './globals.css'
 import ClearWarningsOnRefresh from '@/app/components/ClearWarningsOnRefresh'
 import AutoCollapseLongSections from '@/app/components/AutoCollapseLongSections'
+import QuarterlyPreparationMode from '@/app/components/QuarterlyPreparationMode'
 import AIHelpWidget from '@/app/components/AIHelpWidget'
 
 export const metadata = {
@@ -14,5 +15,5 @@ export const metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><body><ClearWarningsOnRefresh /><AutoCollapseLongSections />{children}<AIHelpWidget /></body></html>
+  return <html lang="en"><body><ClearWarningsOnRefresh /><AutoCollapseLongSections /><QuarterlyPreparationMode />{children}<AIHelpWidget /></body></html>
 }
