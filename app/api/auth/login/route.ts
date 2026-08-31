@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { configuredAppPassword,configuredAppUsername,constantTimeEqual,createAppSession } from '@/lib/app-auth'
+import { createAppSession,validateAppCredentials } from '@/lib/app-auth'
 import { assessLoginRateLimit,pruneLoginAttemptAudit,recordLoginAttempt } from '@/lib/login-rate-limit'
 import { isSameOriginRequest } from '@/lib/request-security'
 
@@ -12,12 +12,10 @@ export async function POST(req:Request){
   const password=String(form.get('password')||'')
   const remember=String(form.get('remember')||'')==='on'
   const next=safeNext(String(form.get('next')||'/'))
-  const expectedUser=configuredAppUsername()
-  const expectedPassword=configuredAppPassword()
   const back=new URL('/login',req.url)
   if(next!=='/')back.searchParams.set('next',next)
 
-  if(!expectedUser||!expectedPassword||!process.env.MTD_SESSION_SECRET){
+  if(!process.env.MTD_SESSION_SECRET){
     back.searchParams.set('error','Application login has not been configured yet.')
     return NextResponse.redirect(back,303)
   }
@@ -27,16 +25,19 @@ export async function POST(req:Request){
     back.searchParams.set('error','Too many sign in attempts. Wait a few minutes and try again.')
     return NextResponse.redirect(back,303)
   }
-  const validUser=await constantTimeEqual(username,expectedUser)
-  const validPassword=await constantTimeEqual(password,expectedPassword)
-  if(!validUser||!validPassword){
+  const credential=await validateAppCredentials(username,password)
+  if(!credential.configured){
+    back.searchParams.set('error','Application login has not been configured yet.')
+    return NextResponse.redirect(back,303)
+  }
+  if(!credential.valid){
     await recordLoginAttempt(req,username,false,'invalid_credentials')
     back.searchParams.set('error','Username or password is incorrect.')
     return NextResponse.redirect(back,303)
   }
 
   const maxAge=remember?60*60*24*30:60*60*12
-  const token=await createAppSession(username,maxAge)
+  const token=await createAppSession(credential.username,maxAge,credential.sessionVersion)
   await recordLoginAttempt(req,username,true,'success')
   void pruneLoginAttemptAudit()
   const res=NextResponse.redirect(new URL(next,req.url),303)
