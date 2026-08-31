@@ -37,7 +37,9 @@ test('middleware only exempts explicitly known public assets',()=>{
 
 test('login rate limiting fails closed when its protection is unavailable',()=>{
   const source=readFileSync('lib/login-rate-limit.ts','utf8')
-  assert.match(source,/if \(!rateLimitSecret\(\)\) \{\s*return \{ ipHash: '', usernameHash: '', limited: true,/s)
+  assert.match(source,/function hasAuditStorage\(\) \{/)
+  assert.match(source,/if \(!rateLimitSecret\(\) \|\| !hasAuditStorage\(\)\) \{\s*return \{ ipHash: '', usernameHash: '', limited: true,/s)
+  assert.match(source,/if \(!rateLimitSecret\(\) \|\| !hasAuditStorage\(\)\) return/)
   assert.match(source,/catch \(error\) \{\s*console\.error\('Login rate limit check failed', error\)\s*return \{ ipHash: '', usernameHash: '', limited: true,/s)
 })
 
