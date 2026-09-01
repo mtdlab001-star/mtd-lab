@@ -28,11 +28,23 @@ function secure(res:NextResponse){
   return res
 }
 
+function hasInvalidTaxpayerContext(path:string){
+  return /^\/taxpayers\/(undefined|null|NaN)(?:\/|$)/i.test(path)
+}
+
 export async function middleware(req:NextRequest){
   const path=req.nextUrl.pathname
   if(publicPages.has(path)||publicAssets.has(path)||path==='/api/help-chat'||path.startsWith('/api/auth/')||path.startsWith('/_next/')) return secure(NextResponse.next())
   const valid=await verifyAppSession(req.cookies.get('mtdlab_session')?.value)
-  if(valid) return secure(NextResponse.next())
+  if(valid){
+    if(hasInvalidTaxpayerContext(path)){
+      const taxpayers=req.nextUrl.clone()
+      taxpayers.pathname='/taxpayers'
+      taxpayers.search=''
+      return secure(NextResponse.redirect(taxpayers))
+    }
+    return secure(NextResponse.next())
+  }
   const login=req.nextUrl.clone()
   login.pathname='/login'
   login.search=''
