@@ -33,7 +33,7 @@ function property(){
 function foreignProperty(){
  const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('Foreign Property')
  const rows:any[][]=[
-  ['Income'],['Account Name','Total Amount (£)'],['Total Rents and Other Receipts',0],['Premiums of Lease Grant',0],['Other Foreign Property Income',0],['Total Income',{formula:'SUM(B3:B5)'}],['Expenses'],['Account Name','Total Amount (£)'],['Allowable Property Expenses',0],['Total Expenses',{formula:'B9'}],['Net Profit/Loss',{formula:'B6-B10'}]
+  ['Income'],['Account Name','Total Amount (£)'],['Total Rents and Other Receipts',0],['Premiums of Lease Grant',0],['Other Foreign Property Income',0],['Total Income',{formula:'SUM(B3:B5)'}],['Expenses'],['Account Name','Total Amount (£)'],['Rent, Rates, Insurance and Ground Rents',0],['Property Repairs and Maintenance',0],['Property Finance Costs',0],['Legal, Management and Professional Fees',0],['Costs of Services Provided',0],['Travel Expenses',0],['Other Allowable Foreign Property Expenses',0],['Total Expenses',{formula:'SUM(B9:B15)'}],['Net Profit/Loss',{formula:'B6-B16'}]
  ]
  rows.forEach(r=>ws.addRow(r));styleSheet(ws);return wb
 }
@@ -44,6 +44,6 @@ export async function GET(_:Request,{params}:{params:Promise<{type:string}>}){
  if(!['self-employment','uk-property','foreign-property'].includes(canonicalType))return new NextResponse('Unsupported MTD template',{status:404})
  const wb=canonicalType==='foreign-property'?foreignProperty():canonicalType==='uk-property'?property():selfEmployment()
  const buffer=await wb.xlsx.writeBuffer()
- const filename=canonicalType==='foreign-property'?'Template_Foreign-Property_MTD_LAB.xlsx':canonicalType==='uk-property'?'Template_UK-Property_Detailed_MTD_LAB.xlsx':'Sample_Self-Employment-Template_MTD_LAB.xlsx'
+ const filename=canonicalType==='foreign-property'?'Template_Foreign-Property_Detailed_MTD_LAB.xlsx':canonicalType==='uk-property'?'Template_UK-Property_Detailed_MTD_LAB.xlsx':'Sample_Self-Employment-Template_MTD_LAB.xlsx'
  return new NextResponse(Buffer.from(buffer),{headers:{'content-type':'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','content-disposition':`attachment; filename="${filename}"`,'cache-control':'no-store'}})
 }

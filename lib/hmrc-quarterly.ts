@@ -24,7 +24,9 @@ export function buildUkPropertyCumulativePayload(p:any){
 export function buildForeignPropertyCumulativePayload(p:any,taxYear?:string){
   const startYear=Number(String(taxYear||'').slice(0,4))
   const identifier=startYear>=2026?{propertyId:String(p.propertyId||'')}:{countryCode:String(p.countryCode||'FRA').toUpperCase()}
-  return {fromDate:p.periodStart,toDate:p.periodEnd,foreignProperty:[{...identifier,income:{rentIncome:{rentAmount:n(p.rents)},foreignTaxCreditRelief:false,premiumsOfLeaseGrant:n(p.leasePremiums),otherPropertyIncome:n(p.otherIncome)},expenses:{consolidatedExpenses:n(p.propertyExpenses)}}]}
+  const detailedExpenses=['premisesCosts','repairsMaintenance','financialCosts','professionalFees','costOfServices','travelCosts','otherExpenses'].reduce((sum,key)=>sum+n(p[key]),0)
+  const consolidatedExpenses=detailedExpenses>0?detailedExpenses:n(p.propertyExpenses)
+  return {fromDate:p.periodStart,toDate:p.periodEnd,foreignProperty:[{...identifier,income:{rentIncome:{rentAmount:n(p.rents)},foreignTaxCreditRelief:false,premiumsOfLeaseGrant:n(p.leasePremiums),otherPropertyIncome:n(p.otherIncome)},expenses:{consolidatedExpenses}}]}
 }
 
 export function cumulativeEndpoint(nino:string,businessId:string,taxYear:string){return `/individuals/business/self-employment/${encodeURIComponent(nino)}/${encodeURIComponent(businessId)}/cumulative/${encodeURIComponent(taxYear)}`}
