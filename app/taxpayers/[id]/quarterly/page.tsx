@@ -54,13 +54,31 @@ function cumulative(records:any[],businessId:string,periodEnd:string,type:string
     propertyExpenses:sum(expense)
   }
 
-  if(type==='uk-property')return {
-    count:rs.length,
-    rents:sum(r=>income(r)&&has(r,['rent'])),
-    otherIncome:sum(r=>income(r)&&!has(r,['rent'])),
-    premisesCosts:sum(r=>expense(r)&&has(r,['premises','rent','rates','utility'])),
-    professionalFees:sum(r=>expense(r)&&has(r,['professional','legal','account'])),
-    otherExpenses:sum(r=>expense(r)&&!has(r,['premises','rent','rates','utility','professional','legal','account']))
+  if(type==='uk-property'){
+    const buckets=[
+      ['premisesCosts',['premises','rent','rates','insurance','ground rent','utility']],
+      ['repairsMaintenance',['repair','maintenance']],
+      ['financialCosts',['finance cost','financial cost','mortgage interest','loan interest']],
+      ['professionalFees',['professional','legal','management','account']],
+      ['costOfServices',['service','cleaning','gardening']],
+      ['travelCosts',['travel','mileage','vehicle']],
+      ['rentARoomRelief',['rent a room relief']],
+      ['residentialFinancialCost',['residential financial cost']],
+      ['carryForwardResidentialFinanceCost',['carried forward','carry forward residential']]
+    ] as const
+    const knownExpenseKeys=buckets.flatMap(([,keys])=>keys)
+    const result:any={
+      count:rs.length,
+      rents:sum(r=>income(r)&&has(r,['rent'])&&!has(r,['rent a room'])),
+      leasePremiums:sum(r=>income(r)&&has(r,['lease','premium'])),
+      reversePremiums:sum(r=>income(r)&&has(r,['reverse premium','inducement'])),
+      otherIncome:sum(r=>income(r)&&!has(r,['rent','lease','premium','tax deducted','rent a room'])),
+      ukTaxDeducted:sum(r=>income(r)&&has(r,['tax deducted','uk tax'])),
+      rentARoomReceived:sum(r=>income(r)&&has(r,['rent a room'])),
+      otherExpenses:sum(r=>expense(r)&&!has(r,knownExpenseKeys))
+    }
+    for(const [name,keys] of buckets)result[name]=sum(r=>expense(r)&&has(r,[...keys]))
+    return result
   }
 
   const buckets=[
@@ -156,7 +174,7 @@ export default async function QuarterlyPage({params,searchParams}:{params:Promis
 
       <section className="panel">
         <div className="detailGrid" style={{marginBottom:16}}><div><span className="eyebrow">Selected income source</span><strong>{sourceLabel}</strong>{selectedSource?.fallback&&<div className="muted">Identified from HMRC obligations</div>}</div><div><span className="eyebrow">Business ID</span><strong className="mono">{selectedBusiness||'Not selected'}</strong></div></div>
-        <div className="tableWrap"><table><thead><tr><th>Period</th><th>Period Dates</th><th>Due Date</th><th>Submission Date & Time</th><th>Status</th><th>Action</th></tr></thead><tbody>{quarterRows.length?quarterRows.map(({o,quarter,submission}:any)=>{const st=visualStatus(o,submission);const fulfilled=String(o.status).toLowerCase()==='fulfilled';const available=quarterlyPeriodIsAvailable(String(o.period_end||''));return <tr key={o.id}><td><strong>Quarter {quarter}</strong></td><td>{fmtDate(o.period_start)} to {fmtDate(o.period_end)}</td><td>{fmtDate(o.due_date)}</td><td>{fmtDateTime(submission?.submitted_at||submission?.created_at)}</td><td><span className={`statusPill ${st.cls}`}>{st.label}</span></td><td>{fulfilled||st.accepted?<Link className="btn btnSmall" href={`/taxpayers/${id}/quarterly/history?businessId=${encodeURIComponent(selectedBusiness)}&periodEnd=${encodeURIComponent(o.period_end)}&sourceType=${encodeURIComponent(sourceType)}`}>View</Link>:available?<Link className="btn btnSmall" href={`/taxpayers/${id}/quarterly?businessId=${encodeURIComponent(selectedBusiness)}&periodEnd=${encodeURIComponent(o.period_end)}&sourceType=${encodeURIComponent(sourceType)}`}>Submit</Link>:<span className="muted">Available after {fmtDate(o.period_end)}</span>}</td></tr>}):<tr><td colSpan={6} className="empty">No eligible quarterly obligations are available for this income source.</td></tr>}</tbody></table></div>
+        <div className="tableWrap"><table><thead><tr><th>Period</th><th>Period Dates</th><th>Due Date</th><th>Submission Date & Time</th><th>Status</th><th>Action</th></tr></thead><tbody>{quarterRows.length?quarterRows.map(({o,quarter,submission}:any)=>{const st=visualStatus(o,submission);const fulfilled=String(o.status).toLowerCase()==='fulfilled';const available=quarterlyPeriodIsAvailable(String(o.period_end||''));return <tr key={o.id}><td><strong>Quarter {quarter}</strong></td><td>{fmtDate(o.period_start)} to {fmtDate(o.period_end)}</td><td>{fmtDate(o.due_date)}</td><td>{fmtDateTime(submission?.submitted_at||submission?.created_at)}</td><td><span className={`statusPill ${st.cls}`}>{st.label}</span></td><td>{fulfilled||st.accepted?<Link className="btn btnSmall" href={`/taxpayers/${id}/quarterly/history?businessId=${encodeURIComponent(selectedBusiness)}&periodEnd=${encodeURIComponent(o.period_end)}&sourceType=${encodeURIComponent(sourceType)}`}>View</Link>:<Link className="btn btnSmall" href={`/taxpayers/${id}/quarterly?businessId=${encodeURIComponent(selectedBusiness)}&periodEnd=${encodeURIComponent(o.period_end)}&sourceType=${encodeURIComponent(sourceType)}`}>{available?'Submit':'Prepare / Review'}</Link>}</td></tr>}):<tr><td colSpan={6} className="empty">No eligible quarterly obligations are available for this income source.</td></tr>}</tbody></table></div>
       </section>
 
       {property&&<section className="panel" style={{marginTop:16}}><div className="sectionHead"><div><h2>{sourceLabel} Annual Submission</h2><p className="muted">Complete the annual property information and year end adjustments for {yearLabel||'the selected tax year'} after quarterly updates are complete.</p></div><Link className="btn" href={`/taxpayers/${id}/end-of-year${yearStart?`?taxYear=${yearStart}-${String(Number(yearStart)+1).slice(-2)}`:''}`}>Annual Submission</Link></div><div className="detailGrid"><div><span className="eyebrow">Income source</span><strong>{sourceLabel}</strong></div><div><span className="eyebrow">Tax return deadline</span><strong>{annualDue}</strong></div></div></section>}
@@ -168,13 +186,31 @@ export default async function QuarterlyPage({params,searchParams}:{params:Promis
           <input type="hidden" name="taxpayerId" value={id}/><input type="hidden" name="businessId" value={selectedBusiness}/><input type="hidden" name="incomeSourceType" value={sourceType}/><input type="hidden" name="periodStart" value={selectedObligation.period_start}/><input type="hidden" name="periodEnd" value={selectedObligation.period_end}/>
 
           {sourceType==='foreign-property'?<>
-            <div className="two"><MoneyField name="rents" label="Rents and other receipts" value={totals.rents}/><MoneyField name="leasePremiums" label="Lease premiums" value={totals.leasePremiums}/></div>
+            <h3>Foreign property income</h3>
+            <div className="two"><MoneyField name="rents" label="Total rents and other receipts" value={totals.rents}/><MoneyField name="leasePremiums" label="Premiums for grant of a lease" value={totals.leasePremiums}/></div>
             <div className="two"><MoneyField name="otherIncome" label="Other foreign property income" value={totals.otherIncome}/><MoneyField name="propertyExpenses" label="Allowable property expenses" value={totals.propertyExpenses}/></div>
           </>:sourceType==='uk-property'?<>
-            <div className="two"><MoneyField name="rents" label="Property rents" value={totals.rents}/><MoneyField name="otherIncome" label="Other property income" value={totals.otherIncome}/></div>
+            <h3>UK property income</h3>
+            <div className="two"><MoneyField name="rents" label="Total rent" value={totals.rents}/><MoneyField name="leasePremiums" label="Premiums for grant of a lease" value={totals.leasePremiums}/></div>
+            <div className="two"><MoneyField name="reversePremiums" label="Reverse premiums and inducements" value={totals.reversePremiums}/><MoneyField name="otherIncome" label="Other property income" value={totals.otherIncome}/></div>
+            <div className="two"><MoneyField name="ukTaxDeducted" label="UK tax deducted" value={totals.ukTaxDeducted}/><MoneyField name="rentARoomReceived" label="Rent a Room received" value={totals.rentARoomReceived}/></div>
             <h3>Allowable expenses</h3>
-            <div className="two"><MoneyField name="premisesCosts" label="Premises costs" value={totals.premisesCosts}/><MoneyField name="professionalFees" label="Professional fees" value={totals.professionalFees}/></div>
-            <MoneyField name="otherExpenses" label="Other expenses" value={totals.otherExpenses}/>
+            <div className="two">
+              <div>
+                <MoneyField name="premisesCosts" label="Rent, rates, insurance and ground rents" value={totals.premisesCosts}/>
+                <MoneyField name="repairsMaintenance" label="Property repairs and maintenance" value={totals.repairsMaintenance}/>
+                <MoneyField name="financialCosts" label="Property finance costs" value={totals.financialCosts}/>
+                <MoneyField name="professionalFees" label="Legal, management and professional fees" value={totals.professionalFees}/>
+                <MoneyField name="costOfServices" label="Costs of services provided" value={totals.costOfServices}/>
+              </div>
+              <div>
+                <MoneyField name="travelCosts" label="Travel expenses" value={totals.travelCosts}/>
+                <MoneyField name="otherExpenses" label="Other allowable property expenses" value={totals.otherExpenses}/>
+                <MoneyField name="rentARoomRelief" label="Rent a Room relief" value={totals.rentARoomRelief}/>
+                <MoneyField name="residentialFinancialCost" label="Residential financial cost" value={totals.residentialFinancialCost}/>
+                <MoneyField name="carryForwardResidentialFinanceCost" label="Residential finance cost carried forward" value={totals.carryForwardResidentialFinanceCost}/>
+              </div>
+            </div>
           </>:<>
             <h3>Business income</h3>
             <div className="two"><MoneyField name="turnover" label="Turnover / income" value={totals.turnover} required/><MoneyField name="otherIncome" label="Other business income" value={totals.otherIncome}/></div>
