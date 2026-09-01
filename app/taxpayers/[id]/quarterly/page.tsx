@@ -46,12 +46,25 @@ function cumulative(records:any[],businessId:string,periodEnd:string,type:string
   const income=(r:any)=>r.record_type==='income'
   const expense=(r:any)=>r.record_type==='expense'
 
-  if(type==='foreign-property')return {
-    count:rs.length,
-    rents:sum(r=>income(r)&&has(r,['rent','receipt'])),
-    leasePremiums:sum(r=>income(r)&&has(r,['lease','premium'])),
-    otherIncome:sum(r=>income(r)&&!has(r,['rent','receipt','lease','premium'])),
-    propertyExpenses:sum(expense)
+  if(type==='foreign-property'){
+    const buckets=[
+      ['premisesCosts',['premises','rent','rates','insurance','ground rent','utility']],
+      ['repairsMaintenance',['repair','maintenance']],
+      ['financialCosts',['finance cost','financial cost','mortgage interest','loan interest']],
+      ['professionalFees',['professional','legal','management','account']],
+      ['costOfServices',['service','cleaning','gardening']],
+      ['travelCosts',['travel','mileage','vehicle']]
+    ] as const
+    const knownExpenseKeys=buckets.flatMap(([,keys])=>keys)
+    const result:any={
+      count:rs.length,
+      rents:sum(r=>income(r)&&has(r,['rent','receipt'])),
+      leasePremiums:sum(r=>income(r)&&has(r,['lease','premium'])),
+      otherIncome:sum(r=>income(r)&&!has(r,['rent','receipt','lease','premium'])),
+      otherExpenses:sum(r=>expense(r)&&!has(r,knownExpenseKeys))
+    }
+    for(const [name,keys] of buckets)result[name]=sum(r=>expense(r)&&has(r,[...keys]))
+    return result
   }
 
   if(type==='uk-property'){
@@ -188,7 +201,21 @@ export default async function QuarterlyPage({params,searchParams}:{params:Promis
           {sourceType==='foreign-property'?<>
             <h3>Foreign property income</h3>
             <div className="two"><MoneyField name="rents" label="Total rents and other receipts" value={totals.rents}/><MoneyField name="leasePremiums" label="Premiums for grant of a lease" value={totals.leasePremiums}/></div>
-            <div className="two"><MoneyField name="otherIncome" label="Other foreign property income" value={totals.otherIncome}/><MoneyField name="propertyExpenses" label="Allowable property expenses" value={totals.propertyExpenses}/></div>
+            <MoneyField name="otherIncome" label="Other foreign property income" value={totals.otherIncome}/>
+            <h3>Allowable expenses</h3>
+            <div className="two">
+              <div>
+                <MoneyField name="premisesCosts" label="Rent, rates, insurance and ground rents" value={totals.premisesCosts}/>
+                <MoneyField name="repairsMaintenance" label="Property repairs and maintenance" value={totals.repairsMaintenance}/>
+                <MoneyField name="financialCosts" label="Property finance costs" value={totals.financialCosts}/>
+                <MoneyField name="professionalFees" label="Legal, management and professional fees" value={totals.professionalFees}/>
+              </div>
+              <div>
+                <MoneyField name="costOfServices" label="Costs of services provided" value={totals.costOfServices}/>
+                <MoneyField name="travelCosts" label="Travel expenses" value={totals.travelCosts}/>
+                <MoneyField name="otherExpenses" label="Other allowable foreign property expenses" value={totals.otherExpenses}/>
+              </div>
+            </div>
           </>:sourceType==='uk-property'?<>
             <h3>UK property income</h3>
             <div className="two"><MoneyField name="rents" label="Total rent" value={totals.rents}/><MoneyField name="leasePremiums" label="Premiums for grant of a lease" value={totals.leasePremiums}/></div>
