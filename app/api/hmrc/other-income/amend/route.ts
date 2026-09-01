@@ -16,7 +16,10 @@ export async function POST(req:Request){
  const form=await req.formData();const taxpayerId=String(form.get('taxpayerId')||'demo');const taxYear=String(form.get('taxYear')||'')
  const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/end-of-year/other-income`,req.url);back.searchParams.set('taxYear',taxYear)
  if(!/^20\d{2}-\d{2}$/.test(taxYear)){back.searchParams.set('error','Select a valid HMRC tax year');return NextResponse.redirect(back,303)}
- const is2026On=taxYearStart(taxYear)>=2026;const payload:any={}
+ const is2026On=taxYearStart(taxYear)>=2026
+ const v3Enabled=process.env.HMRC_OTHER_INCOME_V3_ENABLED==='true'
+ if(is2026On&&!v3Enabled){back.searchParams.set('error','HMRC has not yet published Individuals Other Income API v3 for 2026-27 in the Developer Hub. Preparation is available, but HMRC submission is temporarily unavailable.');return NextResponse.redirect(back,303)}
+ const payload:any={}
  const postAmount=num(form,'postCessationAmount');const postTaxYear=text(form,'postCessationTaxYear')
  if(postAmount!==undefined||postTaxYear){if(postAmount===undefined||!postTaxYear){back.searchParams.set('error','Post cessation receipts require both amount and tax year to be taxed.');return NextResponse.redirect(back,303)}payload.postCessationReceipts=[clean({customerReference:text(form,'postCustomerReference'),businessName:text(form,'postBusinessName'),dateBusinessCeased:text(form,'dateBusinessCeased'),businessDescription:text(form,'businessDescription'),incomeSource:text(form,'postIncomeSource'),amount:postAmount,taxYearIncomeToBeTaxed:postTaxYear})]}
  const businessGross=num(form,'businessReceiptGross');const businessTaxYear=text(form,'businessReceiptTaxYear')
@@ -36,8 +39,9 @@ export async function POST(req:Request){
  const {data:taxpayer}=await supabaseAdmin().from('taxpayers').select('nino').eq('id',taxpayerId).maybeSingle();if(!taxpayer?.nino){back.searchParams.set('error','Taxpayer NINO is missing');return NextResponse.redirect(back,303)}
  let token:string;try{token=await getValidHmrcAccessToken(taxpayerId)}catch(e:any){back.searchParams.set('error',e.message||'HMRC connection is incomplete');return NextResponse.redirect(back,303)}
  const fraud=buildFraudHeaders(req,form,taxpayerId);if(fraud.missing.length){back.searchParams.set('error',`Missing HMRC fraud prevention data: ${fraud.missing.join(', ')}`);return NextResponse.redirect(back,303)}
+ const apiVersion=is2026On?'3.0':'2.0'
  try{
-  const res=await fetch(`${hmrcApiBase}/individuals/other-income/${encodeURIComponent(taxpayer.nino)}/${encodeURIComponent(taxYear)}`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.hmrc.3.0+json','Content-Type':'application/json',...(process.env.HMRC_ENVIRONMENT==='production'?{}:{'Gov-Test-Scenario':'STATEFUL'}),...fraud.headers},body:JSON.stringify(payload),cache:'no-store'})
+  const res=await fetch(`${hmrcApiBase}/individuals/other-income/${encodeURIComponent(taxpayer.nino)}/${encodeURIComponent(taxYear)}`,{method:'PUT',headers:{Authorization:`Bearer ${token}`,Accept:`application/vnd.hmrc.${apiVersion}+json`,'Content-Type':'application/json',...(process.env.HMRC_ENVIRONMENT==='production'?{}:{'Gov-Test-Scenario':'STATEFUL'}),...fraud.headers},body:JSON.stringify(payload),cache:'no-store'})
   const body=await res.text();let data:any={};try{data=body?JSON.parse(body):{}}catch{data={raw:body}}const correlationId=res.headers.get('x-correlationid')||res.headers.get('x-correlation-id')||''
   if(!res.ok){const first=Array.isArray(data?.errors)&&data.errors[0]?`${data.errors[0].code||''} ${data.errors[0].message||''}`.trim():'';back.searchParams.set('error',first||data?.message||data?.code||`HMRC ${res.status}`);if(correlationId)back.searchParams.set('correlationId',correlationId);return NextResponse.redirect(back,303)}
   back.searchParams.set('saved','1');if(correlationId)back.searchParams.set('correlationId',correlationId);return NextResponse.redirect(back,303)
