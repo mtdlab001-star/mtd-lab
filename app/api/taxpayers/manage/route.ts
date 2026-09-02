@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { isSameOriginRequest } from '@/lib/request-security'
+import { currentWorkspace } from '@/lib/workspace'
 
 type ClientAction = 'archive' | 'restore' | 'delete'
 
@@ -8,6 +9,8 @@ export async function POST(req: Request) {
   if (!isSameOriginRequest(req)) return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 })
 
   try {
+    const workspace=await currentWorkspace()
+    if(!workspace)return NextResponse.json({error:'Accounting workspace access is not available'},{status:403})
     const body = await req.json()
     const taxpayerId = String(body?.taxpayerId || '').trim()
     const action = String(body?.action || '') as ClientAction
@@ -21,6 +24,7 @@ export async function POST(req: Request) {
       .from('taxpayers')
       .select('id,display_name,archived_at')
       .eq('id', taxpayerId)
+      .eq('firm_id',workspace.firmId)
       .maybeSingle()
 
     if (lookupError) throw lookupError
@@ -32,6 +36,7 @@ export async function POST(req: Request) {
         .from('taxpayers')
         .update({ archived_at: archivedAt, updated_at: new Date().toISOString() })
         .eq('id', taxpayerId)
+        .eq('firm_id',workspace.firmId)
         .select('id')
         .maybeSingle()
       if (error) throw error
@@ -47,6 +52,7 @@ export async function POST(req: Request) {
       .from('taxpayers')
       .delete()
       .eq('id', taxpayerId)
+      .eq('firm_id',workspace.firmId)
       .select('id')
       .maybeSingle()
 
