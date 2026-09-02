@@ -28,19 +28,21 @@ export async function createAppSession(username:string,maxAgeSeconds=60*60*12){
   return `${payload}|${await hmac(payload)}`
 }
 
-export async function verifyAppSession(token?:string|null){
-  if(!token||!secret()) return false
+export async function readAppSessionUsername(token?:string|null){
+  if(!token||!secret()) return null
   const parts=token.split('|')
-  if(parts.length!==3) return false
+  if(parts.length!==3) return null
   const [username,expiresText,signature]=parts
   const expires=Number(expiresText)
-  if(!username||!Number.isFinite(expires)||expires<Date.now()) return false
+  if(!username||!Number.isFinite(expires)||expires<Date.now()) return null
   const expected=await hmac(`${username}|${expiresText}`)
-  if(signature.length!==expected.length) return false
+  if(signature.length!==expected.length) return null
   let diff=0
   for(let i=0;i<signature.length;i++) diff|=signature.charCodeAt(i)^expected.charCodeAt(i)
-  return diff===0
+  return diff===0?username:null
 }
+
+export async function verifyAppSession(token?:string|null){return Boolean(await readAppSessionUsername(token))}
 
 export function configuredAppUsername(){return process.env.MTD_APP_USERNAME||''}
 export function configuredAppPassword(){return process.env.MTD_APP_PASSWORD||''}
