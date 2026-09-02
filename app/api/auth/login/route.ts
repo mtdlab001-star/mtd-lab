@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server'
 import { configuredAppPassword,configuredAppUsername,constantTimeEqual,createAppSession } from '@/lib/app-auth'
 import { assessLoginRateLimit,pruneLoginAttemptAudit,recordLoginAttempt } from '@/lib/login-rate-limit'
+import { verifyPassword } from '@/lib/password-hash'
 import { isSameOriginRequest } from '@/lib/request-security'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 function safeNext(value:string){return value.startsWith('/')&&!value.startsWith('//')?value:'/'}
 
@@ -17,21 +19,39 @@ export async function POST(req:Request){
   const back=new URL('/login',req.url)
   if(next!=='/')back.searchParams.set('next',next)
 
-  if(!expectedUser||!expectedPassword||!process.env.MTD_SESSION_SECRET){
+  if(!process.env.MTD_SESSION_SECRET){
     back.searchParams.set('error','Application login has not been configured yet.')
     return NextResponse.redirect(back,303)
   }
-  const validUser=await constantTimeEqual(username,expectedUser)
-  const validPassword=await constantTimeEqual(password,expectedPassword)
+
   const rateLimit=await assessLoginRateLimit(req,username)
-  if(rateLimit.limited&&(!validUser||!validPassword)){
+  let valid=false
+  let blockedReason=''
+
+  if(expectedUser&&expectedPassword&&await constantTimeEqual(username,expectedUser)){
+    valid=await constantTimeEqual(password,expectedPassword)
+  }else{
+    try{
+      const db=supabaseAdmin()
+      const {data:user}=await db.from('app_users').select('id,username,password_hash,status,firm_id,accounting_firms!inner(status)').eq('username',username).maybeSingle()
+      const firm=Array.isArray((user as any)?.accounting_firms)?(user as any).accounting_firms[0]:(user as any)?.accounting_firms
+      if(user&&user.status==='approved'&&firm?.status==='approved'){
+        valid=await verifyPassword(password,user.password_hash)
+        if(valid)await db.from('app_users').update({last_login_at:new Date().toISOString(),updated_at:new Date().toISOString()}).eq('id',user.id)
+      }else if(user&&(user.status==='pending'||firm?.status==='pending')) blockedReason='Your accounting firm registration is awaiting approval.'
+      else if(user&&(user.status==='suspended'||firm?.status==='suspended')) blockedReason='This accounting firm account is suspended.'
+      else if(user&&(user.status==='rejected'||firm?.status==='rejected')) blockedReason='This accounting firm registration has not been approved.'
+    }catch{}
+  }
+
+  if(rateLimit.limited&&!valid){
     await recordLoginAttempt(req,username,false,'rate_limited')
     back.searchParams.set('error','Too many sign in attempts. Wait a few minutes and try again.')
     return NextResponse.redirect(back,303)
   }
-  if(!validUser||!validPassword){
-    await recordLoginAttempt(req,username,false,'invalid_credentials')
-    back.searchParams.set('error','Username or password is incorrect.')
+  if(!valid){
+    await recordLoginAttempt(req,username,false,blockedReason?'account_not_approved':'invalid_credentials')
+    back.searchParams.set('error',blockedReason||'Username or password is incorrect.')
     return NextResponse.redirect(back,303)
   }
 
