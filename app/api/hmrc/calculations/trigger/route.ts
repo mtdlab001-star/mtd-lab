@@ -8,6 +8,8 @@ import { isSameOriginRequest } from '@/lib/request-security'
 import { agentCan } from '@/lib/agent-authorisation'
 import { yearEndFinalisationStatus } from '@/lib/year-end-finalisation'
 
+function taxYearPeriod(taxYear:string){const startYear=Number(taxYear.slice(0,4));return {from:`${startYear}-04-06`,to:`${startYear+1}-04-05`}}
+
 export async function POST(req:Request){
  if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
  const form=await req.formData();const taxpayerId=String(form.get('taxpayerId')||'demo');const taxYear=String(form.get('taxYear')||'');const calculationType=String(form.get('calculationType')||'in-year');const actingAgentId=String(form.get('actingAgentId')||'').trim()||null
@@ -18,9 +20,10 @@ export async function POST(req:Request){
  if(actingAgentId){const allowed=await agentCan(taxpayerId,actingAgentId,'can_submit_final_declaration');if(!allowed){back.searchParams.set('error','The selected agent is not currently authorised to manage HMRC calculations for this taxpayer.');return NextResponse.redirect(back,303)}}
  const db=supabaseAdmin();const {data:taxpayer}=await db.from('taxpayers').select('nino').eq('id',taxpayerId).maybeSingle();if(!taxpayer?.nino){back.searchParams.set('error','Taxpayer NINO is missing');return NextResponse.redirect(back,303)}
  if(calculationType==='intent-to-finalise'){
+  const period=taxYearPeriod(taxYear)
   const [{count:businessCount},{data:obligations},{data:reviews}]=await Promise.all([
    db.from('hmrc_businesses').select('id',{count:'exact',head:true}).eq('taxpayer_id',taxpayerId),
-   db.from('hmrc_obligations').select('period_start,status').eq('taxpayer_id',taxpayerId).gte('period_start','2025-04-06'),
+   db.from('hmrc_obligations').select('period_start,period_end,status').eq('taxpayer_id',taxpayerId).gte('period_start',period.from).lte('period_end',period.to),
    db.from('mtd_year_end_reviews').select('section,status').eq('taxpayer_id',taxpayerId).eq('tax_year',taxYear),
   ])
   const readiness=yearEndFinalisationStatus({taxYear,businessCount:businessCount||0,obligations:obligations||[],reviews:reviews||[]})
