@@ -24,7 +24,7 @@ export function normaliseQuarterlySourceType(value:string):QuarterlySourceType|n
 }
 
 export function quarterlyPeriodIsAvailable(periodEnd:string,currentDate=new Date().toISOString().slice(0,10)){
-  return Boolean(periodEnd&&/^\d{4}-\d{2}-\d{2}$/.test(periodEnd)&&periodEnd<=currentDate)
+  return Boolean(periodEnd&&/^\d{4}-\d{2}-\d{2}$/.test(periodEnd)&&/^\d{4}-\d{2}-\d{2}$/.test(currentDate)&&periodEnd<currentDate)
 }
 
 function storedBusinessSourceType(business:any):QuarterlySourceType{
@@ -50,7 +50,7 @@ export function quarterlySubmissionEligibility(input:EligibilityInput):Quarterly
   }
 
   if(!input.allowFuturePeriod&&!quarterlyPeriodIsAvailable(input.periodEnd,input.currentDate)){
-    return {ok:false,error:`This quarterly update cannot be submitted before the period ends on ${input.periodEnd}`}
+    return {ok:false,error:`This quarterly update cannot be submitted until the period ending ${input.periodEnd} has fully ended`}
   }
 
   const duplicate=submissions.some((s:any)=>{
