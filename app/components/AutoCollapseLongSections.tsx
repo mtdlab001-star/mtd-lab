@@ -21,10 +21,8 @@ function enhancePanel(panel: HTMLElement) {
   button.type = 'button'
   button.textContent = 'Show more ▾'
   button.setAttribute('aria-expanded', 'false')
-  button.style.position = 'absolute'
-  button.style.top = '14px'
-  button.style.right = '14px'
-  button.style.zIndex = '8'
+  button.style.display = 'block'
+  button.style.margin = '0 0 12px auto'
   button.style.border = '1px solid #2a4f84'
   button.style.borderRadius = '8px'
   button.style.padding = '8px 11px'
@@ -66,7 +64,7 @@ function enhancePanel(panel: HTMLElement) {
     }
   })
 
-  panel.appendChild(button)
+  panel.insertBefore(button, panel.firstChild)
   panel.appendChild(fade)
 }
 
