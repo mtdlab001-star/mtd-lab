@@ -6,9 +6,7 @@ export type MtdIncomeSourceRecord={businessId:string;businessName:string|null;so
 export function mergeMtdIncomeSources(businesses:any[],obligations:any[]):MtdIncomeSourceRecord[]{
   const sources=new Map<string,MtdIncomeSourceRecord>()
   for(const business of businesses||[]){const businessId=String(business.business_id||'').trim();if(businessId)sources.set(businessId,{businessId,businessName:business.business_name||null,sourceType:incomeSourceType(business),fallback:false})}
-  if(sources.size===0){
-    for(const obligation of obligations||[]){const businessId=String(obligation.business_id||'').trim();if(businessId&&!sources.has(businessId))sources.set(businessId,{businessId,businessName:null,sourceType:incomeSourceTypeFromBusinessId(businessId),fallback:true})}
-  }
+  for(const obligation of obligations||[]){const businessId=String(obligation.business_id||'').trim();if(businessId&&!sources.has(businessId))sources.set(businessId,{businessId,businessName:null,sourceType:incomeSourceTypeFromBusinessId(businessId),fallback:true})}
   const order:Record<MtdIncomeSourceType,number>={'self-employment':0,'uk-property':1,'foreign-property':2}
   return Array.from(sources.values()).sort((a,b)=>order[a.sourceType]-order[b.sourceType]||String(a.businessName||a.businessId).localeCompare(String(b.businessName||b.businessId)))
 }
