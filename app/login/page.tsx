@@ -24,6 +24,7 @@ export default async function LoginPage({searchParams}:{searchParams:Promise<Rec
             <div className={s.options}><label><input type="checkbox" name="remember"/> Remember me</label><a href="/forgot-password">Forgot password?</a></div>
             <button className={s.button} type="submit">▣ &nbsp; Sign In</button>
           </form>
+          <p style={{textAlign:'center',margin:'18px 0 0',color:'#c7cfdf'}}>New accounting firm? <a href="/register" style={{color:'#1d94ff',fontWeight:700}}>Register for access</a></p>
           {qs.error&&<div className={s.error}>{qs.error}</div>}
           <div className={s.rule}><span>MTD Lab – Making Tax Digital for Income Tax</span></div>
           <div id="help" className={s.help}><div className={s.helpIcon}>♬</div><div><strong>Need help?</strong><p>Find practical guides and troubleshooting support.</p><a href="/help">Open Help Centre <span aria-hidden="true">→</span></a></div></div>
