@@ -38,12 +38,12 @@ test('year end requires income sources, obligations and all controlled reviews',
   })
   assert.deepEqual(result.blockers,[
     'No HMRC income sources found',
-    'Open or missing quarterly obligations remain',
+    'Due or missing quarterly obligations remain',
     'Year end schedules have not all been reviewed',
   ])
 })
 
-test('an open quarterly obligation blocks year end',()=>{
+test('a due quarterly obligation blocks year end',()=>{
   const result=yearEndFinalisationStatus({
     taxYear:'2026-27',
     businessCount:1,
@@ -53,7 +53,7 @@ test('an open quarterly obligation blocks year end',()=>{
   })
   assert.equal(result.canFinalise,false)
   assert.equal(result.openCount,1)
-  assert.ok(result.blockers.includes('Open or missing quarterly obligations remain'))
+  assert.ok(result.blockers.includes('Due or missing quarterly obligations remain'))
 })
 
 test('future quarterly obligations remain not due until their period has fully ended',()=>{
