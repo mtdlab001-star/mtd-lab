@@ -1,0 +1,22 @@
+import Link from 'next/link'
+import {redirect} from 'next/navigation'
+import {currentWorkspace} from '@/lib/workspace'
+import {supabaseAdmin} from '@/lib/supabase-admin'
+
+export const dynamic='force-dynamic'
+
+function price(value:number|null){return value==null?'Price to be confirmed':new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP',maximumFractionDigits:0}).format(value/100)+' / year'}
+function date(value?:string|null){if(!value)return 'Starts when billing launches';return new Date(`${value}T00:00:00`).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
+
+export default async function BillingPage(){
+ const workspace=await currentWorkspace()
+ if(!workspace)redirect('/login')
+ const db=supabaseAdmin()
+ const [{data:bundles},{data:subscription},{count:used}]=await Promise.all([
+  db.from('subscription_bundles').select('id,code,name,client_capacity,annual_price_pence,currency').eq('is_active',true).order('sort_order'),
+  db.from('firm_subscriptions').select('id,status,renewal_date,base_capacity,addon_capacity').eq('firm_id',workspace.firmId).maybeSingle(),
+  db.from('taxpayers').select('*',{count:'exact',head:true}).eq('firm_id',workspace.firmId).is('archived_at',null)
+ ])
+ const base=Number(subscription?.base_capacity||0),addons=Number(subscription?.addon_capacity||0),capacity=base+addons,clients=used||0,remaining=Math.max(0,capacity-clients)
+ return <div className="shell"><aside className="side"><div className="brand"><img className="brandLogo" src="/mtd-lab-logo-post-login.svg" alt="MTD Lab"/></div><div className="nav"><Link href="/">Dashboard</Link><Link href="/taxpayers">Taxpayers</Link><Link className="navActive" href="/billing">Plans &amp; Billing</Link>{workspace.superAdmin&&<Link href="/admin/firms">Firm access</Link>}</div></aside><main className="main"><div className="top"><div><h1 className="pageTitle">Plans &amp; Billing</h1><p className="muted">Annual client bundles for {workspace.firmName}. Billing is in pre-launch mode while MTD Lab completes HMRC recognition.</p></div><Link className="btn btnSmall" href="/">Dashboard</Link></div><div className="status"><strong>Pre-launch billing</strong><div>No payment will be taken from this page. Prices and checkout will be activated for commercial launch.</div></div><div className="cards"><div className="card"><span className="eyebrow">Client capacity</span><strong>{capacity||'—'}</strong><span className="muted">Base {base} + add-ons {addons}</span></div><div className="card"><span className="eyebrow">Clients used</span><strong>{clients}</strong><span className="muted">Active taxpayers</span></div><div className="card"><span className="eyebrow">Spaces remaining</span><strong>{capacity?remaining:'—'}</strong><span className="muted">Additional bundles can increase capacity</span></div><div className="card"><span className="eyebrow">Annual renewal</span><strong style={{fontSize:'18px'}}>{date(subscription?.renewal_date)}</strong><span className="muted">One renewal date for all capacity</span></div></div><section className="panel"><div className="sectionHead"><div><h2>Annual client bundles</h2><p className="muted">Choose a starting bundle. After launch, extra bundles can be added to the same account and aligned to its annual renewal date.</p></div></div><div className="cards">{(bundles||[]).map((b:any)=><div className="card" key={b.id}><span className="eyebrow">Annual bundle</span><strong>{b.name}</strong><span className="muted">Up to {b.client_capacity} active clients</span><div style={{marginTop:'12px',fontWeight:700}}>{price(b.annual_price_pence)}</div><button className="btn btnSmall" type="button" disabled style={{marginTop:'14px'}}>Available after launch</button></div>)}</div></section><section className="panel" style={{marginTop:'18px'}}><h2>Add client capacity</h2><p className="muted">Existing subscribers will be able to buy any bundle above as additional capacity. The add-on will run to the account's existing renewal date, with the charge calculated for the remaining subscription period.</p><div className="detailGrid"><div><span className="eyebrow">Example</span><strong>20 + 10 = 30 clients</strong></div><div><span className="eyebrow">Renewal model</span><strong>One annual renewal date</strong></div></div></section></main></div>
+}
