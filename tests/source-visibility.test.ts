@@ -8,10 +8,10 @@ test('taxpayer sidebar does not show every income source when sourceTypes is omi
   assert.doesNotMatch(source,/sourceTypes\?\.length \? sourceTypes : \['self-employment', 'uk-property', 'foreign-property'\]/)
 })
 
-test('obligation fallback sources are used only when HMRC returned no businesses',()=>{
+test('obligation fallback sources supplement HMRC business rows when a source is missing',()=>{
   const resolver=readFileSync(new URL('../lib/mtd-income-sources-server.ts',import.meta.url),'utf8')
-  assert.match(resolver,/if\(sources\.size===0\)\{/)
-  assert.doesNotMatch(resolver,/if\(businessId&&!sources\.has\(businessId\)\)sources\.set\(businessId,\{businessId,businessName:null,sourceType:incomeSourceTypeFromBusinessId\(businessId\),fallback:true\}\)\}\s*const order/)
+  assert.doesNotMatch(resolver,/if\(sources\.size===0\)\{/)
+  assert.match(resolver,/if\(businessId&&!sources\.has\(businessId\)\)sources\.set\(businessId,\{businessId,businessName:null,sourceType:incomeSourceTypeFromBusinessId\(businessId\),fallback:true\}\)/)
 })
 
 test('taxpayer overview filters grouped obligations to visible income sources',()=>{
