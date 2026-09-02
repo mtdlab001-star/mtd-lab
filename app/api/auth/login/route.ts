@@ -68,10 +68,26 @@ export async function POST(req:Request){
   }
 
   const maxAge=remember?60*60*24*30:60*60*12
-  const token=await createAppSession(sessionUsername,maxAge)
+  const session=await createAppSession(sessionUsername,maxAge)
+  try{
+    const db=supabaseAdmin()
+    const {error:sessionError}=await db.from('app_active_sessions').upsert({
+      username:sessionUsername.toLowerCase(),
+      session_id:session.sessionId,
+      issued_at:new Date().toISOString(),
+      expires_at:new Date(session.expires).toISOString(),
+      updated_at:new Date().toISOString()
+    },{onConflict:'username'})
+    if(sessionError)throw sessionError
+  }catch(error){
+    console.error('Could not establish single-user session',error)
+    back.searchParams.set('error','Sign in could not be completed. Please try again.')
+    return NextResponse.redirect(back,303)
+  }
+
   await recordLoginAttempt(req,normalizedUsername,true,'success')
   void pruneLoginAttemptAudit()
   const res=NextResponse.redirect(new URL(next,req.url),303)
-  res.cookies.set('mtdlab_session',token,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge})
+  res.cookies.set('mtdlab_session',session.token,{httpOnly:true,secure:process.env.NODE_ENV==='production',sameSite:'lax',path:'/',maxAge})
   return res
 }
