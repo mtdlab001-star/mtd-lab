@@ -16,6 +16,16 @@ function sourceTypeFromSelect(select:HTMLSelectElement|null){
   return 'self-employment'
 }
 
+function nextUkDate(value:string){
+  const match=value.match(/(\d{2})\s+([A-Za-z]{3})\s+(\d{4})/)
+  if(!match)return ''
+  const months=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+  const month=months.findIndex(m=>m.toLowerCase()===match[2].toLowerCase())
+  if(month<0)return ''
+  const d=new Date(Date.UTC(Number(match[3]),month,Number(match[1])+1))
+  return d.toLocaleDateString('en-GB',{timeZone:'UTC',day:'2-digit',month:'short',year:'numeric'})
+}
+
 function installQuarterPreparationLinks(){
   const select=document.querySelector<HTMLSelectElement>('select#businessId')
   const businessId=select?.value||''
@@ -66,16 +76,17 @@ function installFutureSubmissionLock(){
   const form=Array.from(document.querySelectorAll<HTMLFormElement>('form')).find(f=>f.action.includes('/api/hmrc/quarterly/submit'))
   const button=form?.querySelector<HTMLButtonElement>('button[type="submit"]')
   if(!form||!button)return
+  const availableFrom=nextUkDate(dateText)
   button.disabled=true
   button.setAttribute('aria-disabled','true')
-  button.title=`HMRC submission becomes available after ${dateText}`
-  button.textContent=`HMRC submission available after ${dateText}`
+  button.title=availableFrom?`HMRC submission becomes available from ${availableFrom}`:`HMRC submission becomes available after ${dateText}`
+  button.textContent=availableFrom?`HMRC submission available from ${availableFrom}`:`HMRC submission available after ${dateText}`
   if(!form.querySelector('[data-future-quarter-lock]')){
     const notice=document.createElement('div')
     notice.dataset.futureQuarterLock='1'
     notice.className='status'
     notice.style.marginBottom='12px'
-    notice.innerHTML=`<strong>Preparation mode.</strong><div>Figures can be reviewed now. HMRC submission becomes available after the quarter ending ${dateText} has fully ended.</div>`
+    notice.innerHTML=`<strong>Preparation mode.</strong><div>Figures can be reviewed now. HMRC submission becomes available ${availableFrom?`from ${availableFrom}`:`after the quarter ending ${dateText} has fully ended`}.</div>`
     form.prepend(notice)
   }
 }
