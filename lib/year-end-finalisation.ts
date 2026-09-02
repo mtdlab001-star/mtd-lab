@@ -64,9 +64,8 @@ export function yearEndFinalisationStatus({
   const ended=taxYearHasEnded(taxYear,now)
   const incomeSourcesReady=businessCount>0
   const quarterlyReady=yearObligations.length>0&&openCount===0
-  const reviewComplete=completedReviewCount===YEAR_END_REVIEW_SECTIONS.length
   const quarterlyBlocker=!quarterlyReady
-    ? dueCount>0
+    ? yearObligations.length===0||dueCount>0
       ? 'Due or missing quarterly obligations remain'
       : 'Future quarterly obligations are not due yet'
     : null
