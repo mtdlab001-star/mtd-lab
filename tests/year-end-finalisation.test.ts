@@ -5,10 +5,10 @@ import { YEAR_END_REVIEW_SECTIONS, taxYearHasEnded, yearEndFinalisationStatus } 
 
 const completedReviews=YEAR_END_REVIEW_SECTIONS.map(section=>({section,status:'reviewed'}))
 const fulfilledObligations=[
-  {period_start:'2026-04-06',status:'fulfilled'},
-  {period_start:'2026-07-06',status:'fulfilled'},
-  {period_start:'2026-10-06',status:'fulfilled'},
-  {period_start:'2027-01-06',status:'fulfilled'},
+  {period_start:'2026-04-06',period_end:'2026-07-05',status:'fulfilled'},
+  {period_start:'2026-04-06',period_end:'2026-10-05',status:'fulfilled'},
+  {period_start:'2026-04-06',period_end:'2027-01-05',status:'fulfilled'},
+  {period_start:'2026-04-06',period_end:'2027-04-05',status:'fulfilled'},
 ]
 
 test('tax year finalisation starts on 6 April after the selected year',()=>{
@@ -47,13 +47,29 @@ test('an open quarterly obligation blocks year end',()=>{
   const result=yearEndFinalisationStatus({
     taxYear:'2026-27',
     businessCount:1,
-    obligations:[...fulfilledObligations,{period_start:'2027-03-01',status:'open'}],
+    obligations:[...fulfilledObligations,{period_start:'2026-04-06',period_end:'2027-04-05',status:'open'}],
     reviews:completedReviews,
     now:new Date('2027-04-06T00:00:00Z'),
   })
   assert.equal(result.canFinalise,false)
   assert.equal(result.openCount,1)
   assert.ok(result.blockers.includes('Open or missing quarterly obligations remain'))
+})
+
+test('future quarterly obligations remain not due until their period has fully ended',()=>{
+  const result=yearEndFinalisationStatus({
+    taxYear:'2026-27',
+    businessCount:1,
+    obligations:[
+      {period_start:'2026-04-06',period_end:'2026-07-05',status:'fulfilled'},
+      {period_start:'2026-04-06',period_end:'2026-10-05',status:'open'},
+    ],
+    reviews:completedReviews,
+    now:new Date('2026-10-05T23:59:59.999Z'),
+  })
+  assert.equal(result.dueCount,0)
+  assert.equal(result.notDueYetCount,1)
+  assert.ok(result.blockers.includes('Future quarterly obligations are not due yet'))
 })
 
 test('year end becomes ready only when every server condition is satisfied',()=>{
@@ -78,7 +94,14 @@ test('intent to finalise and Final Declaration routes enforce the shared server 
   assert.match(trigger,/yearEndFinalisationStatus/)
   assert.match(trigger,/if\(!readiness\.canFinalise\)/)
   assert.ok(trigger.indexOf('if(!readiness.canFinalise)')<trigger.indexOf('let token:string'))
+  assert.match(trigger,/select\('period_start,period_end,status'\)/)
+  assert.match(trigger,/\.gte\('period_start',period\.from\)\.lte\('period_end',period\.to\)/)
+
   assert.match(declaration,/yearEndFinalisationStatus/)
   assert.match(declaration,/if\(!readiness\.canFinalise\)/)
+  assert.match(declaration,/select\('period_start,period_end,status'\)/)
+  assert.match(declaration,/\.gte\('period_start',period\.from\)\.lte\('period_end',period\.to\)/)
+
   assert.match(calculationPage,/!readiness\.canFinalise/)
+  assert.match(calculationPage,/select\('period_start,period_end,status'\)/)
 })
