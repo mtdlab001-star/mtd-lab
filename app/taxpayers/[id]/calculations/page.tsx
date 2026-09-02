@@ -19,7 +19,7 @@ export default async function CalculationsPage({params,searchParams}:{params:Pro
   const [{data:taxpayer},{count:businessCount},{data:obligations},{data:submissions},{data:agentRows}]=await Promise.all([
     db.from('taxpayers').select('display_name,nino').eq('id',id).maybeSingle(),
     db.from('hmrc_businesses').select('id',{count:'exact',head:true}).eq('taxpayer_id',id),
-    db.from('hmrc_obligations').select('period_start,status').eq('taxpayer_id',id).gte('period_start','2025-04-06'),
+    db.from('hmrc_obligations').select('period_start,period_end,status').eq('taxpayer_id',id).gte('period_start','2025-04-06'),
     db.from('hmrc_quarterly_submissions').select('tax_year,status').eq('taxpayer_id',id).eq('status','submitted'),
     db.from('mtd_agent_authorisations').select('agent_id,expires_at,mtd_agents(agent_name,organisation_name,hmrc_arn,status)').eq('taxpayer_id',id).eq('status','authorised').eq('can_submit_final_declaration',true)
   ])
