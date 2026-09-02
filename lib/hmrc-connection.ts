@@ -1,5 +1,26 @@
 import { refreshAccessToken } from '@/lib/hmrc'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { currentWorkspace } from '@/lib/workspace'
+
+async function taxpayerWorkspace(){
+  const workspace=await currentWorkspace()
+  if(!workspace)throw new Error('Accounting workspace access is not available')
+  return workspace
+}
+
+async function assertTaxpayerAccess(taxpayerId:string){
+  const workspace=await taxpayerWorkspace()
+  const {data}=await supabaseAdmin().from('taxpayers').select('id').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle()
+  if(!data)throw new Error('This taxpayer is not available in your accounting workspace')
+  return workspace
+}
+
+async function assertAgentAccess(agentId:string){
+  const workspace=await taxpayerWorkspace()
+  const {data}=await supabaseAdmin().from('mtd_agents').select('id').eq('id',agentId).eq('firm_id',workspace.firmId).maybeSingle()
+  if(!data)throw new Error('This agent is not available in your accounting workspace')
+  return workspace
+}
 
 async function refreshStoredToken(table:string,column:string,id:string,conn:any){
   if(!conn.refresh_token) throw new Error('HMRC session expired. Reconnect to HMRC.')
@@ -18,8 +39,9 @@ async function refreshStoredToken(table:string,column:string,id:string,conn:any)
 }
 
 export async function getValidHmrcAccessToken(taxpayerId:string){
+  const workspace=await assertTaxpayerAccess(taxpayerId)
   const db=supabaseAdmin()
-  const {data:conn,error}=await db.from('hmrc_connections').select('*').eq('taxpayer_id',taxpayerId).maybeSingle()
+  const {data:conn,error}=await db.from('hmrc_connections').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).maybeSingle()
   if(error||!conn?.access_token) throw new Error('Connect this taxpayer to HMRC first')
 
   const expiresAt=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0
@@ -31,9 +53,13 @@ export async function getValidHmrcAccessToken(taxpayerId:string){
 }
 
 export async function getValidAgentHmrcAccessToken(agentId:string){
+  const workspace=await assertAgentAccess(agentId)
   const db=supabaseAdmin()
   const {data:conn,error}=await db.from('agent_hmrc_connections').select('*').eq('agent_id',agentId).maybeSingle()
   if(error||!conn?.access_token) throw new Error('Connect this agent ASA to HMRC before filing for authorised clients.')
+
+  const {data:agent}=await db.from('mtd_agents').select('id').eq('id',agentId).eq('firm_id',workspace.firmId).maybeSingle()
+  if(!agent)throw new Error('This agent is not available in your accounting workspace')
 
   const expiresAt=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0
   const needsRefresh=Boolean(expiresAt && expiresAt <= Date.now()+60_000)
@@ -44,6 +70,7 @@ export async function getValidAgentHmrcAccessToken(agentId:string){
 }
 
 export async function getHmrcAccessTokenForActingCapacity(taxpayerId:string,agentId?:string|null){
+  await assertTaxpayerAccess(taxpayerId)
   if(agentId) return getValidAgentHmrcAccessToken(agentId)
   return getValidHmrcAccessToken(taxpayerId)
 }
