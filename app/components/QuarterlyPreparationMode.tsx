@@ -69,13 +69,13 @@ function installFutureSubmissionLock(){
   button.disabled=true
   button.setAttribute('aria-disabled','true')
   button.title=`HMRC submission becomes available after ${dateText}`
-  button.textContent=`HMRC submission locked until ${dateText}`
+  button.textContent=`HMRC submission available after ${dateText}`
   if(!form.querySelector('[data-future-quarter-lock]')){
     const notice=document.createElement('div')
     notice.dataset.futureQuarterLock='1'
     notice.className='status'
     notice.style.marginBottom='12px'
-    notice.innerHTML=`<strong>Preparation mode.</strong><div>Figures can be reviewed now. HMRC submission becomes available after the quarter ends on ${dateText}.</div>`
+    notice.innerHTML=`<strong>Preparation mode.</strong><div>Figures can be reviewed now. HMRC submission becomes available after the quarter ending ${dateText} has fully ended.</div>`
     form.prepend(notice)
   }
 }
