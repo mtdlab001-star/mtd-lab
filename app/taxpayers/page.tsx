@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { currentWorkspace } from '@/lib/workspace'
 import TaxpayerActions from './TaxpayerActions'
 
 export const dynamic = 'force-dynamic'
@@ -9,13 +10,17 @@ export default async function TaxpayersPage({ searchParams }: { searchParams: Pr
   const archived = qs.view === 'archived'
   let taxpayers:any[]=[]
   let unavailable=''
+  const workspace=await currentWorkspace()
+  if(!workspace) unavailable='Your accounting workspace is not available or is not approved.'
   try {
-    const db=supabaseAdmin()
-    let query=db.from('taxpayers').select('*').order('created_at',{ascending:true})
-    query=archived?query.not('archived_at','is',null):query.is('archived_at',null)
-    const {data,error}=await query
-    if(error)throw error
-    taxpayers=data||[]
+    if(workspace){
+      const db=supabaseAdmin()
+      let query=db.from('taxpayers').select('*').eq('firm_id',workspace.firmId).order('created_at',{ascending:true})
+      query=archived?query.not('archived_at','is',null):query.is('archived_at',null)
+      const {data,error}=await query
+      if(error)throw error
+      taxpayers=data||[]
+    }
   } catch (error:any) {
     unavailable=error?.message||'Database configuration is temporarily unavailable.'
   }
@@ -27,7 +32,7 @@ export default async function TaxpayersPage({ searchParams }: { searchParams: Pr
       <div className="operator">Operated by Glomaxel IT Service</div>
     </aside>
     <main className="main">
-      <div className="top"><div><h1 className="pageTitle">{archived?'Archived taxpayers':'Taxpayers'}</h1><p className="muted">{archived?'Archived clients remain available for restoration or permanent removal.':'Manage active HMRC MTD taxpayer workspaces.'}</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><Link className="btn btnSmall" href={archived?'/taxpayers':'/taxpayers?view=archived'}>{archived?'View active clients':'View archived clients'}</Link><Link className="btn btnSmall" href="/agents">Manage agents</Link><Link className="btn" href="/taxpayers/sandbox">Add HMRC sandbox taxpayer</Link></div></div>
+      <div className="top"><div><h1 className="pageTitle">{archived?'Archived taxpayers':'Taxpayers'}</h1><p className="muted">{archived?'Archived clients remain available for restoration or permanent removal.':`Manage active HMRC MTD taxpayer workspaces${workspace?` for ${workspace.firmName}`:''}.`}</p></div><div style={{display:'flex',gap:8,flexWrap:'wrap'}}><Link className="btn btnSmall" href={archived?'/taxpayers':'/taxpayers?view=archived'}>{archived?'View active clients':'View archived clients'}</Link><Link className="btn btnSmall" href="/agents">Manage agents</Link><Link className="btn" href="/taxpayers/sandbox">Add HMRC sandbox taxpayer</Link></div></div>
       {unavailable&&<div className="status statusError"><strong>Taxpayer data is temporarily unavailable.</strong><div>{unavailable}</div></div>}
       <div className="status"><strong>Archive is the safe default.</strong> It hides a client from active lists without deleting HMRC connections, businesses, obligations, submissions, sync runs or audit history.</div>
       <section className="panel" style={{marginTop:24}}>
