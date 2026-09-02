@@ -21,7 +21,7 @@ const publicAssets=new Set([
   '/mtd-lab-logo.svg',
 ])
 
-const publicPages=new Set(['/login','/help','/forgot-password'])
+const publicPages=new Set(['/login','/register','/help','/forgot-password'])
 
 function secure(res:NextResponse){
   for(const [key,value] of securityHeaders)res.headers.set(key,value)
