@@ -1,4 +1,5 @@
 import './globals.css'
+import './operator-hide.css'
 import ClearWarningsOnRefresh from '@/app/components/ClearWarningsOnRefresh'
 import AutoCollapseLongSections from '@/app/components/AutoCollapseLongSections'
 import QuarterlyPreparationMode from '@/app/components/QuarterlyPreparationMode'
