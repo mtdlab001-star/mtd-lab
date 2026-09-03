@@ -13,9 +13,10 @@ export async function getAgentAuthorisation(taxpayerId:string,agentId:string){
   const db=supabaseAdmin()
   const workspace=await currentWorkspace()
   if(!workspace) return null
-  const {data,error}=await db.from('mtd_agent_authorisations').select('*,mtd_agents(*)').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).eq('agent_id',agentId).maybeSingle()
+  const {data,error}=await db.from('mtd_agent_authorisations').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).eq('agent_id',agentId).maybeSingle()
   if(error) throw error
   const row:any=data
+  if(row?.agent_id){const {data:agent,error:agentError}=await db.from('mtd_agents').select('*').eq('firm_id',workspace.firmId).eq('id',row.agent_id).maybeSingle();if(agentError)throw agentError;row.mtd_agents=agent}
   if(row?.status==='authorised'&&row.expires_at&&new Date(row.expires_at).getTime()<=Date.now()){
     await db.from('mtd_agent_authorisations').update({status:'expired',updated_at:new Date().toISOString()}).eq('id',row.id).eq('firm_id',workspace.firmId).eq('status','authorised')
     row.status='expired'
@@ -49,17 +50,22 @@ export async function resolveConnectedAgentForPermission(taxpayerId:string,permi
 
   const {data:authorisations,error:authorisationError}=await db
     .from('mtd_agent_authorisations')
-    .select('agent_id,expires_at,revoked_at,mtd_agents(status)')
+    .select('agent_id,expires_at,revoked_at')
     .eq('firm_id',workspace.firmId)
     .eq('taxpayer_id',taxpayerId)
     .eq('status','authorised')
     .eq(permission,true)
   if(authorisationError) throw authorisationError
 
+  const agentIds=Array.from(new Set((authorisations||[]).map((row:any)=>String(row.agent_id||'')).filter(Boolean)))
+  const {data:agents,error:agentsError}=agentIds.length?await db.from('mtd_agents').select('id,status').eq('firm_id',workspace.firmId).in('id',agentIds):{data:[],error:null} as any
+  if(agentsError) throw agentsError
+  const agentStatusById=new Map((agents||[]).map((agent:any)=>[String(agent.id),agent.status]))
+
   const active=(authorisations||[]).filter((row:any)=>{
     if(row.revoked_at) return false
     if(row.expires_at&&new Date(row.expires_at).getTime()<=Date.now()) return false
-    return !row.mtd_agents?.status||row.mtd_agents.status==='active'
+    return agentStatusById.get(String(row.agent_id))==='active'
   })
 
   const ids=active.map((row:any)=>String(row.agent_id)).filter(Boolean)
