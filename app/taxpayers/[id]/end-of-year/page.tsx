@@ -1,24 +1,27 @@
 import Link from 'next/link'
+import { redirect } from 'next/navigation'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import FraudContextFields from '@/app/components/FraudContextFields'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { YEAR_END_REVIEW_SECTIONS, taxYearFromDate, yearEndFinalisationStatus } from '@/lib/year-end-finalisation'
+import { currentWorkspace } from '@/lib/workspace'
 
 export const dynamic='force-dynamic'
 
 function isProperty(b:any){const t=String(b.business_type||'').toLowerCase();const r=JSON.stringify(b.raw||{}).toLowerCase();return t.includes('property')||r.includes('property')}
 
 export default async function EndOfYearPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
- const {id}=await params;const qs=await searchParams;const db=supabaseAdmin()
+ const {id}=await params;const qs=await searchParams;const workspace=await currentWorkspace();if(!workspace)redirect('/login');const db=supabaseAdmin()
  const [{data:taxpayer},{data:businesses},{data:obligations},{data:submissions}]=await Promise.all([
-  db.from('taxpayers').select('display_name,nino').eq('id',id).maybeSingle(),
-  db.from('hmrc_businesses').select('*').eq('taxpayer_id',id),
-  db.from('hmrc_obligations').select('*').eq('taxpayer_id',id).gte('period_start','2025-04-06'),
-  db.from('hmrc_quarterly_submissions').select('*').eq('taxpayer_id',id)
+  db.from('taxpayers').select('display_name,nino').eq('id',id).eq('firm_id',workspace.firmId).maybeSingle(),
+  db.from('hmrc_businesses').select('*').eq('taxpayer_id',id).eq('firm_id',workspace.firmId),
+  db.from('hmrc_obligations').select('*').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).gte('period_start','2025-04-06'),
+  db.from('hmrc_quarterly_submissions').select('*').eq('taxpayer_id',id).eq('firm_id',workspace.firmId)
  ])
+ if(!taxpayer)redirect('/taxpayers')
  const years=Array.from(new Set((obligations||[]).map((o:any)=>taxYearFromDate(o.period_start)))).sort().reverse()
  const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27')
- const {data:reviews}=await db.from('mtd_year_end_reviews').select('section,status,note,reviewed_at').eq('taxpayer_id',id).eq('tax_year',selected)
+ const {data:reviews}=await db.from('mtd_year_end_reviews').select('section,status,note,reviewed_at').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).eq('tax_year',selected)
  const reviewMap=new Map((reviews||[]).map((r:any)=>[r.section,r]))
  const accepted=(submissions||[]).filter((s:any)=>s.tax_year===selected&&s.status==='submitted')
  const businessCount=(businesses||[]).length
@@ -26,7 +29,7 @@ export default async function EndOfYearPage({params,searchParams}:{params:Promis
  const acceptedReady=accepted.length>0
  const tracked=[...YEAR_END_REVIEW_SECTIONS]
  const readiness=yearEndFinalisationStatus({taxYear:selected,businessCount,obligations:obligations||[],reviews:reviews||[]})
- const {canFinalise,blockers,incomeSourcesReady,quarterlyReady,reviewComplete,yearObligationCount,openCount,dueCount,notDueYetCount,completedReviewCount}=readiness
+ const {canFinalise,blockers,incomeSourcesReady,quarterlyReady,reviewComplete,yearObligationCount,dueCount,notDueYetCount,completedReviewCount}=readiness
  const quarterlyLabel=quarterlyReady?'Complete':dueCount>0?(notDueYetCount>0?`${dueCount} Due · ${notDueYetCount} Not Due Yet`:`${dueCount} Due`):`${notDueYetCount} Not Due Yet`
  const quarterlyChecklist=quarterlyReady?'Complete':dueCount>0?'Due periods remain':'Future periods remain'
  const statusInfo=(section:string)=>{const r:any=reviewMap.get(section);if(!r)return {label:'Not reviewed',cls:'statusOpen'};if(r.status==='reviewed')return {label:'Reviewed',cls:'statusDone'};if(r.status==='not_applicable')return {label:'Not applicable',cls:'statusDone'};return {label:'Action required',cls:'statusOpen'}}
