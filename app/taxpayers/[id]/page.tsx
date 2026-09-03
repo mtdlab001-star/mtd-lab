@@ -1,5 +1,4 @@
 import Link from 'next/link'
-import { notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import { assessHmrcConnection } from '@/lib/hmrc-connection-status'
@@ -90,9 +89,7 @@ function displayStatus(obligation: any, submission?: any) {
 export default async function TaxpayerPage({ params, searchParams }: { params: Promise<{id:string}>, searchParams: Promise<Record<string,string|undefined>> }) {
   const { id } = await params
   const qs = await searchParams
-  const workspace = await currentWorkspace()
-  if (!workspace) notFound()
-  let taxpayer: any = null
+  let taxpayer: any = { id, display_name: id === 'demo' ? 'HMRC Sandbox Taxpayer' : id, nino: '', mtditid: '' }
   let businesses: any[] = []
   let obligations: any[] = []
   let submissions: any[] = []
@@ -101,32 +98,32 @@ export default async function TaxpayerPage({ params, searchParams }: { params: P
   let lastSync: string | null = null
   let lastSuccessfulSync: string | null = null
   let syncError: string | null = null
+  const workspace=await currentWorkspace()
 
   try {
-    const db = supabaseAdmin()
-    const [{data:t},{data:b},{data:o},{data:q},{data:c},{data:s},{data:lastGood}] = await Promise.all([
-      db.from('taxpayers').select('*').eq('id',id).eq('firm_id',workspace.firmId).maybeSingle(),
-      db.from('hmrc_businesses').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).order('created_at'),
-      db.from('hmrc_obligations').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).order('due_date',{ascending:true}),
-      db.from('hmrc_quarterly_submissions').select('business_id,period_end,status,submitted_at,created_at').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).eq('status','submitted').order('created_at',{ascending:false}),
-      db.from('hmrc_connections').select('access_token,refresh_token,token_expires_at,connected_at,scope').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).maybeSingle(),
-      db.from('hmrc_sync_runs').select('status,error_message,completed_at').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).order('created_at',{ascending:false}).limit(1).maybeSingle(),
-      db.from('hmrc_sync_runs').select('completed_at').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).eq('status','complete').order('created_at',{ascending:false}).limit(1).maybeSingle()
-    ])
-    if (!t) notFound()
-    taxpayer = t
-    businesses = b || []
-    obligations = o || []
-    submissions = q || []
-    connection = c
-    syncStatus = s?.status === 'complete' ? 'Complete' : s?.status === 'failed' ? 'Latest sync failed' : 'Not synced'
-    lastSync = s?.completed_at || null
-    syncError = s?.status === 'failed' ? (s.error_message || 'HMRC synchronisation failed') : null
-    lastSuccessfulSync = lastGood?.completed_at || null
-  } catch (error:any) {
-    if (error?.digest?.startsWith?.('NEXT_NOT_FOUND')) throw error
-    notFound()
-  }
+    if(workspace){
+      const db = supabaseAdmin()
+      const firmId=workspace.firmId
+      const [{data:t},{data:b},{data:o},{data:q},{data:c},{data:s},{data:lastGood}] = await Promise.all([
+        db.from('taxpayers').select('*').eq('id',id).eq('firm_id',firmId).maybeSingle(),
+        db.from('hmrc_businesses').select('*').eq('taxpayer_id',id).eq('firm_id',firmId).order('created_at'),
+        db.from('hmrc_obligations').select('*').eq('taxpayer_id',id).eq('firm_id',firmId).order('due_date',{ascending:true}),
+        db.from('hmrc_quarterly_submissions').select('business_id,period_end,status,submitted_at,created_at').eq('taxpayer_id',id).eq('firm_id',firmId).eq('status','submitted').order('created_at',{ascending:false}),
+        db.from('hmrc_connections').select('access_token,refresh_token,token_expires_at,connected_at,scope').eq('taxpayer_id',id).eq('firm_id',firmId).maybeSingle(),
+        db.from('hmrc_sync_runs').select('status,error_message,completed_at').eq('taxpayer_id',id).eq('firm_id',firmId).order('created_at',{ascending:false}).limit(1).maybeSingle(),
+        db.from('hmrc_sync_runs').select('completed_at').eq('taxpayer_id',id).eq('firm_id',firmId).eq('status','complete').order('created_at',{ascending:false}).limit(1).maybeSingle()
+      ])
+      if (t) taxpayer = t
+      businesses = b || []
+      obligations = o || []
+      submissions = q || []
+      connection = c
+      syncStatus = s?.status === 'complete' ? 'Complete' : s?.status === 'failed' ? 'Latest sync failed' : 'Not synced'
+      lastSync = s?.completed_at || null
+      syncError = s?.status === 'failed' ? (s.error_message || 'HMRC synchronisation failed') : null
+      lastSuccessfulSync = lastGood?.completed_at || null
+    }
+  } catch {}
 
   const connectionStatus = assessHmrcConnection(connection)
   const latestError = qs.error || syncError

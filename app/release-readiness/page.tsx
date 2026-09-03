@@ -4,6 +4,7 @@ import { HMRC_API_VERSIONS } from '@/lib/hmrc-api-versions'
 import { expireAgentAuthorisations } from '@/lib/agent-authorisation'
 import { assessHmrcConnection } from '@/lib/hmrc-connection-status'
 import { incomeSourceTypeFromBusinessId, type MtdIncomeSourceType } from '@/lib/mtd-income-source'
+import { currentWorkspace } from '@/lib/workspace'
 
 export const dynamic='force-dynamic'
 const laneOrder:MtdIncomeSourceType[]=['self-employment','uk-property','foreign-property']
@@ -12,25 +13,30 @@ function submissionType(row:any):MtdIncomeSourceType{const raw=JSON.stringify(ro
 function taxYearEnded(taxYear:string){const start=Number(taxYear.slice(0,4));return Number.isFinite(start)&&Date.now()>=Date.UTC(start+1,3,6)}
 
 export default async function ReleaseReadinessPage(){
+ const workspace=await currentWorkspace()
+ if(!workspace){
+  return <div className="shell"><aside className="side"><div className="brand"><img className="brandLogo" src="/mtd-lab-logo-post-login.svg" alt="MTD Lab"/></div><div className="nav"><Link href="/">Dashboard</Link><Link href="/taxpayers">Taxpayers</Link><Link href="/agents">Agents</Link><Link href="/taxpayers/sandbox">Sandbox setup</Link><span>Release readiness</span></div><div className="operator">Operated by Glomaxel IT Service</div></aside><main className="main"><div className="top"><div><h1 className="pageTitle">Stage 2 release readiness</h1><p className="muted">Controlled evidence gate before any production MTD Income Tax submission capability is enabled.</p></div><span className="statusPill statusOpen">Workspace unavailable</span></div><div className="status statusError" style={{marginTop:16}}><strong>Accounting workspace unavailable.</strong><div>Your account may still be awaiting approval or may have been suspended.</div></div></main></div>
+ }
  const db=(()=>{try{return supabaseAdmin()}catch{return null}})()
  if(!db){
   return <div className="shell"><aside className="side"><div className="brand"><img className="brandLogo" src="/mtd-lab-logo-post-login.svg" alt="MTD Lab"/></div><div className="nav"><Link href="/">Dashboard</Link><Link href="/taxpayers">Taxpayers</Link><Link href="/agents">Agents</Link><Link href="/taxpayers/sandbox">Sandbox setup</Link><span>Release readiness</span></div><div className="operator">Operated by Glomaxel IT Service</div></aside><main className="main"><div className="top"><div><h1 className="pageTitle">Stage 2 release readiness</h1><p className="muted">Controlled evidence gate before any production MTD Income Tax submission capability is enabled.</p></div><span className="statusPill statusOpen">Configuration needed</span></div><div className="status statusError" style={{marginTop:16}}><strong>Release evidence cannot be loaded.</strong><div>Check the Vercel Supabase server environment variables, then redeploy the app.</div></div><section className="panel" style={{marginTop:16}}><h2>Required configuration</h2><p className="muted">Production needs the Supabase URL and service role key before MTD Lab can read taxpayers, agents, obligations and submission evidence.</p></section></main></div>
  }
+ const firmId=workspace.firmId
  try{await expireAgentAuthorisations()}catch{}
  const [taxpayers,connections,syncs,quarterly,obligations,calculations,finals,directFinals,agentFinals,activeQuarterlyAgentAuths,loginAttempts,digitalRecords,yearEndReviews,evidenceBucket]=await Promise.all([
-  db.from('taxpayers').select('id,display_name,nino').is('archived_at',null).order('display_name'),
-  db.from('hmrc_connections').select('access_token,refresh_token,token_expires_at,scope'),
-  db.from('hmrc_sync_runs').select('id',{count:'exact',head:true}).eq('status','complete'),
-  db.from('hmrc_quarterly_submissions').select('taxpayer_id,business_id,tax_year,request_payload,acting_agent_id,status').eq('status','submitted'),
-  db.from('hmrc_obligations').select('business_id,period_start').gte('period_start','2025-04-06').not('business_id','is',null),
-  db.from('mtd_submission_audit').select('id,tax_year,calculation_id,hmrc_correlation_id',{count:'exact'}).eq('event_type','tax_calculation_retrieval').eq('status','accepted'),
-  db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','final_declaration').eq('status','accepted'),
-  db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','final_declaration').eq('status','accepted').is('acting_agent_id',null),
-  db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('event_type','final_declaration').eq('status','accepted').not('acting_agent_id','is',null),
-  db.from('mtd_agent_authorisations').select('id',{count:'exact',head:true}).eq('status','active').eq('can_submit_quarterly',true),
+  db.from('taxpayers').select('id,display_name,nino').eq('firm_id',firmId).is('archived_at',null).order('display_name'),
+  db.from('hmrc_connections').select('access_token,refresh_token,token_expires_at,scope').eq('firm_id',firmId),
+  db.from('hmrc_sync_runs').select('id',{count:'exact',head:true}).eq('firm_id',firmId).eq('status','complete'),
+  db.from('hmrc_quarterly_submissions').select('taxpayer_id,business_id,tax_year,request_payload,acting_agent_id,status').eq('firm_id',firmId).eq('status','submitted'),
+  db.from('hmrc_obligations').select('business_id,period_start').eq('firm_id',firmId).gte('period_start','2025-04-06').not('business_id','is',null),
+  db.from('mtd_submission_audit').select('id,tax_year,calculation_id,hmrc_correlation_id',{count:'exact'}).eq('firm_id',firmId).eq('event_type','tax_calculation_retrieval').eq('status','accepted'),
+  db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('firm_id',firmId).eq('event_type','final_declaration').eq('status','accepted'),
+  db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('firm_id',firmId).eq('event_type','final_declaration').eq('status','accepted').is('acting_agent_id',null),
+  db.from('mtd_submission_audit').select('id',{count:'exact',head:true}).eq('firm_id',firmId).eq('event_type','final_declaration').eq('status','accepted').not('acting_agent_id','is',null),
+  db.from('mtd_agent_authorisations').select('id',{count:'exact',head:true}).eq('firm_id',firmId).eq('status','authorised').eq('can_submit_quarterly',true),
   db.from('app_login_attempts').select('id',{count:'exact',head:true}),
-  db.from('mtd_digital_records').select('id',{count:'exact',head:true}),
-  db.from('mtd_year_end_reviews').select('id',{count:'exact',head:true}).in('status',['reviewed','not_applicable']),
+  db.from('mtd_digital_records').select('id',{count:'exact',head:true}).eq('firm_id',firmId),
+  db.from('mtd_year_end_reviews').select('id',{count:'exact',head:true}).eq('firm_id',firmId).in('status',['reviewed','not_applicable']),
   db.storage.getBucket('mtd-evidence')
  ])
  const accepted=quarterly.data||[];const directQuarterly=accepted.filter((row:any)=>!row.acting_agent_id).length;const agentQuarterly=accepted.filter((row:any)=>row.acting_agent_id).length;const applicableBusinessIds=Array.from(new Set((obligations.data||[]).map((row:any)=>String(row.business_id||'')).filter(Boolean)));const acceptedBusinessIds=new Set(accepted.map((row:any)=>String(row.business_id||'')));const applicableTypes=new Set(applicableBusinessIds.map(incomeSourceTypeFromBusinessId));const laneEvidence=laneOrder.map(type=>{const count=accepted.filter((row:any)=>submissionType(row)===type).length;const applicable=applicableTypes.has(type);return {type,label:label(type),applicable,count,ok:!applicable||count>0}})

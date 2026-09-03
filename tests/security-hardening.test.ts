@@ -148,6 +148,11 @@ test('quarterly submissions recheck eligibility and prevent duplicate transmissi
 
   assert.match(page,/!latestSubmission\(selectedPeriodEnd\)/)
   assert.match(prepareRoute,/quarterlySubmissionEligibility/)
+  assert.match(prepareRoute,/currentWorkspace/)
+  assert.match(prepareRoute,/db\.from\('taxpayers'\)\.select\('id'\)\.eq\('id',taxpayerId\)\.eq\('firm_id',workspace\.firmId\)/)
+  assert.match(prepareRoute,/db\.from\('hmrc_businesses'\).*\.eq\('firm_id',workspace\.firmId\)/)
+  assert.match(prepareRoute,/db\.from\('hmrc_obligations'\).*\.eq\('firm_id',workspace\.firmId\)/)
+  assert.match(prepareRoute,/db\.from\('hmrc_quarterly_submissions'\).*\.eq\('firm_id',workspace\.firmId\)/)
   assert.match(submitRoute,/quarterlySubmissionEligibility/)
   assert.match(submitRoute,/auditError\?\.code==='23505'/)
   assert.match(migration,/create unique index if not exists idx_hmrc_quarterly_submissions_one_active_period/)
@@ -168,6 +173,65 @@ test('agent ASA OAuth state and callback are stored separately from taxpayer OAu
   assert.match(agentsPage,/agentId=\$\{encodeURIComponent\(r\.agent_id\)\}/)
 })
 
+test('delegated agent relationship controls are firm scoped and audited',()=>{
+  const route=readFileSync('app/api/agents/hmrc-relationship/route.ts','utf8')
+  const revoke=readFileSync('app/api/agents/revoke/route.ts','utf8')
+  const helper=readFileSync('lib/agent-authorisation.ts','utf8')
+  const page=readFileSync('app/taxpayers/[id]/agents/page.tsx','utf8')
+
+  assert.match(route,/currentWorkspace/)
+  assert.match(route,/buildFraudHeaders\(req,form,taxpayerId\)/)
+  assert.match(route,/db\.from\('taxpayers'\).*\.eq\('firm_id',workspace\.firmId\)/)
+  assert.match(route,/db\.from\('mtd_agents'\).*\.eq\('firm_id',workspace\.firmId\)/)
+  assert.match(route,/db\.from\('mtd_agent_authorisations'\).*\.eq\('firm_id',workspace\.firmId\)/)
+  assert.match(route,/db\.from\('agent_hmrc_connections'\).*\.eq\('firm_id',workspace\.firmId\)/)
+  assert.match(route,/mtd_submission_audit/)
+  assert.match(route,/hmrc_correlation_id/)
+  assert.match(revoke,/\.eq\('firm_id',workspace\.firmId\)/)
+  assert.match(helper,/currentWorkspace/)
+  assert.match(helper,/\.eq\('firm_id',workspace\.firmId\)/)
+  assert.match(page,/FraudContextFields/)
+  assert.match(page,/db\.from\('mtd_agent_authorisations'\).*\.eq\('firm_id',workspace\.firmId\)/)
+})
+
+test('taxpayer HMRC pages scope read models to the current firm',()=>{
+  const pageFiles=[
+    'app/taxpayers/[id]/page.tsx',
+    'app/taxpayers/[id]/businesses/page.tsx',
+    'app/taxpayers/[id]/digital-records/page.tsx',
+    'app/taxpayers/[id]/submissions/page.tsx',
+    'app/taxpayers/[id]/quarterly/page.tsx',
+    'app/taxpayers/[id]/quarterly/readiness/page.tsx',
+    'app/taxpayers/[id]/quarterly/review/page.tsx',
+    'app/taxpayers/[id]/quarterly/history/page.tsx',
+    'app/taxpayers/[id]/end-of-year/adjustments/page.tsx',
+    'app/taxpayers/[id]/end-of-year/employment/page.tsx',
+    'app/taxpayers/[id]/end-of-year/other-income/page.tsx',
+    'app/taxpayers/[id]/end-of-year/reliefs/page.tsx',
+    'app/taxpayers/[id]/end-of-year/state-benefits/page.tsx',
+    'app/taxpayers/[id]/end-of-year/tax-liability/page.tsx',
+    'app/taxpayers/[id]/calculations/confirmation/page.tsx',
+  ]
+  for(const file of pageFiles){
+    const source=readFileSync(file,'utf8')
+    assert.match(source,/currentWorkspace/,`${file} must resolve the active workspace`)
+    assert.match(source,/firmId|workspace\.firmId/,`${file} must keep the active firm id available`)
+    assert.match(source,/eq\('firm_id'/,`${file} must scope Supabase reads with firm_id`)
+  }
+})
+
+test('firm, session and billing tables explicitly deny browser roles',()=>{
+  const migration=readFileSync('supabase/migrations/015_private_firm_and_billing_rls.sql','utf8')
+  for(const table of ['accounting_firms','app_active_sessions','app_users','firm_access_audit','firm_subscription_purchases','firm_subscriptions','subscription_bundles']){
+    assert.match(migration,new RegExp(`'${table}'`))
+  }
+  assert.match(migration,/for select to anon, authenticated using \(false\)/)
+  assert.match(migration,/for insert to anon, authenticated with check \(false\)/)
+  assert.match(migration,/for update to anon, authenticated using \(false\) with check \(false\)/)
+  assert.match(migration,/for delete to anon, authenticated using \(false\)/)
+  assert.match(migration,/revoke all on public\.\%I from anon, authenticated/)
+})
+
 test('HMRC test business creation is sandbox only and restricted to property types',()=>{
   const source=readFileSync('app/api/hmrc/test-support/business/route.ts','utf8')
   assert.match(source,/process\.env\.HMRC_ENVIRONMENT==='production'/)
@@ -176,4 +240,11 @@ test('HMRC test business creation is sandbox only and restricted to property typ
   assert.match(source,/Accept:'application\/vnd\.hmrc\.1\.0\+json'/)
   assert.match(source,/getValidHmrcAccessToken\(taxpayerId\)/)
   assert.match(source,/JSON\.stringify\(\{typeOfBusiness:businessType\}\)/)
+})
+
+test('sandbox agent creation uses the shared HMRC production guard',()=>{
+  const source=readFileSync('app/api/agents/create-test-agent/route.ts','utf8')
+  assert.match(source,/currentWorkspace/)
+  assert.match(source,/process\.env\.HMRC_ENVIRONMENT === 'production'/)
+  assert.match(source,/create-test-user\/agents/)
 })

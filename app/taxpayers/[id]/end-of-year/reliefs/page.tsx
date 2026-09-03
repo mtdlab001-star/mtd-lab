@@ -4,14 +4,15 @@ import FraudContextFields from '@/app/components/FraudContextFields'
 import HmrcAttemptStatus from '@/app/components/HmrcAttemptStatus'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { latestHmrcAttempt, latestHmrcResponse } from '@/lib/hmrc-response-audit'
+import { currentWorkspace } from '@/lib/workspace'
 
 export const dynamic='force-dynamic'
 const labels:Record<string,string>={investment:'Investment Reliefs',other:'Other Reliefs',foreign:'Foreign Reliefs',pensions:'Pension Reliefs',charitable:'Charitable Giving'}
 const money=(name:string,label:string)=><label>{label}<input className="inputField" name={name} type="number" min="0" step="0.01"/></label>
 
 export default async function ReliefsPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
- const {id}=await params;const qs=await searchParams;const db=supabaseAdmin();const {data:obligations}=await db.from('hmrc_obligations').select('period_start').eq('taxpayer_id',id).gte('period_start','2025-04-06')
- const years=Array.from(new Set((obligations||[]).map((o:any)=>{const d=String(o.period_start);const y=Number(d.slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse();const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27');const type=labels[qs.type||'other']?String(qs.type):'other';const stored=await latestHmrcResponse(db,{taxpayerId:id,taxYear:selected,eventType:'reliefs_retrieval',requestKey:'type',requestValue:type});const latestAttempt=await latestHmrcAttempt(db,{taxpayerId:id,taxYear:selected,eventType:'reliefs_retrieval',requestKey:'type',requestValue:type});const result=stored?.response_summary||stored?.response_payload||null
+ const {id}=await params;const qs=await searchParams;const db=supabaseAdmin();const workspace=await currentWorkspace();const firmId=workspace?.firmId||'';const {data:obligations}=firmId?await db.from('hmrc_obligations').select('period_start').eq('taxpayer_id',id).eq('firm_id',firmId).gte('period_start','2025-04-06'):{data:[] as any[]}
+ const years:string[]=Array.from(new Set<string>((obligations||[]).map((o:any)=>{const d=String(o.period_start);const y=Number(d.slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse();const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27');const type=labels[qs.type||'other']?String(qs.type):'other';const stored=await latestHmrcResponse(db,{taxpayerId:id,taxYear:selected,eventType:'reliefs_retrieval',requestKey:'type',requestValue:type});const latestAttempt=await latestHmrcAttempt(db,{taxpayerId:id,taxYear:selected,eventType:'reliefs_retrieval',requestKey:'type',requestValue:type});const result=stored?.response_summary||stored?.response_payload||null
  return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="reliefs"/><main className="main">
   <div className="top"><div><h1 className="pageTitle">Reliefs and Deductions</h1><p className="muted">Review, create and amend relief information before the end of year calculation and Final Declaration.</p></div><span className="badge">{selected}</span></div>
   {qs.error&&<div className="status statusError"><strong>HMRC needs attention.</strong><div>{qs.error}</div>{qs.correlationId&&<div className="muted">Correlation ID: {qs.correlationId}</div>}</div>}

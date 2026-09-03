@@ -3,13 +3,14 @@ import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import HmrcAttemptStatus from '@/app/components/HmrcAttemptStatus'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { latestHmrcAttempt, latestHmrcResponse } from '@/lib/hmrc-response-audit'
+import { currentWorkspace } from '@/lib/workspace'
 
 export const dynamic='force-dynamic'
 function gbp(v:any){return new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(Number(v||0))}
 
 export default async function StateBenefitsPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
- const {id}=await params;const qs=await searchParams;const db=supabaseAdmin();const {data:obligations}=await db.from('hmrc_obligations').select('period_start').eq('taxpayer_id',id).gte('period_start','2025-04-06')
- const years=Array.from(new Set((obligations||[]).map((o:any)=>{const d=String(o.period_start);const y=Number(d.slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse();const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27');const stored=await latestHmrcResponse(db,{taxpayerId:id,taxYear:selected,eventType:'state_benefits_retrieval'});const latestAttempt=await latestHmrcAttempt(db,{taxpayerId:id,taxYear:selected,eventType:'state_benefits_retrieval'});const result:any=stored?.response_summary||stored?.response_payload||null;const rows=Array.isArray(result?.stateBenefits)?result.stateBenefits:Array.isArray(result?.benefits)?result.benefits:[]
+ const {id}=await params;const qs=await searchParams;const db=supabaseAdmin();const workspace=await currentWorkspace();const firmId=workspace?.firmId||'';const {data:obligations}=firmId?await db.from('hmrc_obligations').select('period_start').eq('taxpayer_id',id).eq('firm_id',firmId).gte('period_start','2025-04-06'):{data:[] as any[]}
+ const years:string[]=Array.from(new Set<string>((obligations||[]).map((o:any)=>{const d=String(o.period_start);const y=Number(d.slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse();const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27');const stored=await latestHmrcResponse(db,{taxpayerId:id,taxYear:selected,eventType:'state_benefits_retrieval'});const latestAttempt=await latestHmrcAttempt(db,{taxpayerId:id,taxYear:selected,eventType:'state_benefits_retrieval'});const result:any=stored?.response_summary||stored?.response_payload||null;const rows=Array.isArray(result?.stateBenefits)?result.stateBenefits:Array.isArray(result?.benefits)?result.benefits:[]
  return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="state-benefits"/><main className="main">
   <div className="top"><div><h1 className="pageTitle">State Benefits</h1><p className="muted">Review taxable state benefits held by HMRC before the end of year calculation.</p></div><span className="badge">{selected}</span></div>
   {qs.error&&<div className="status statusError"><strong>HMRC needs attention.</strong><div>{qs.error}</div>{qs.correlationId&&<div className="muted">Correlation ID: {qs.correlationId}</div>}</div>}

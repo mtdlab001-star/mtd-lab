@@ -4,6 +4,7 @@ import { assessHmrcConnection } from '@/lib/hmrc-connection-status'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import { incomeSourceTypeFromBusinessId, type MtdIncomeSourceType } from '@/lib/mtd-income-source'
 import { quarterlyPeriodIsAvailable } from '@/lib/quarterly-submission-eligibility'
+import { currentWorkspace } from '@/lib/workspace'
 
 export const dynamic='force-dynamic'
 
@@ -28,18 +29,22 @@ export default async function ReadinessPage({params,searchParams}:{params:Promis
   const requestedType=String(query.sourceType||'')
   const sourceType:MtdIncomeSourceType=['self-employment','uk-property','foreign-property'].includes(requestedType)?requestedType as MtdIncomeSourceType:incomeSourceTypeFromBusinessId(businessId)
   const db=supabaseAdmin()
+  const workspace=await currentWorkspace()
+  const firmId=workspace?.firmId||''
   let taxpayer:any=null,connection:any=null,eligible:any[]=[],auditReady=false
   try{
+    if(!firmId)throw new Error('Workspace unavailable')
     const [{data:t},{data:c},{data:o}]=await Promise.all([
-      db.from('taxpayers').select('nino,mtditid').eq('id',id).maybeSingle(),
-      db.from('hmrc_connections').select('access_token,refresh_token,token_expires_at,scope').eq('taxpayer_id',id).maybeSingle(),
-      db.from('hmrc_obligations').select('business_id,period_start,period_end,due_date,status').eq('taxpayer_id',id)
+      db.from('taxpayers').select('nino,mtditid').eq('id',id).eq('firm_id',firmId).maybeSingle(),
+      db.from('hmrc_connections').select('access_token,refresh_token,token_expires_at,scope').eq('taxpayer_id',id).eq('firm_id',firmId).maybeSingle(),
+      db.from('hmrc_obligations').select('business_id,period_start,period_end,due_date,status').eq('taxpayer_id',id).eq('firm_id',firmId)
     ])
     taxpayer=t;connection=c
     eligible=(o||[]).filter((x:any)=>String(x.status).toLowerCase()==='open'&&x.period_start>='2025-04-06'&&(!businessId||String(x.business_id||'')===businessId)&&(!periodStart||String(x.period_start||'')===periodStart)&&(!periodEnd||String(x.period_end||'')===periodEnd))
   }catch{}
   try{
-    const {error}=await db.from('hmrc_quarterly_submissions').select('id').limit(1)
+    if(!firmId)throw new Error('Workspace unavailable')
+    const {error}=await db.from('hmrc_quarterly_submissions').select('id').eq('firm_id',firmId).limit(1)
     auditReady=!error
   }catch{}
   const sandbox=process.env.HMRC_ENVIRONMENT!=='production'

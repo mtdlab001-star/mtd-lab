@@ -4,6 +4,7 @@ import { verifyReviewPayload } from '@/lib/review-token'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { normaliseHmrcErrors } from '@/lib/hmrc-errors'
+import { currentWorkspace } from '@/lib/workspace'
 
 function gbp(n:number){return new Intl.NumberFormat('en-GB',{style:'currency',currency:'GBP'}).format(n||0)}
 function fmtDate(value?:string){if(!value)return 'Not available';const d=new Date(`${value}T00:00:00`);return Number.isNaN(d.getTime())?value:d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
@@ -15,14 +16,14 @@ const foreignPropertyRows=[['rents','Total rents and other receipts'],['leasePre
 export default async function ReviewPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
  const {id}=await params;const qs=await searchParams;const token=String(qs.data||'');const p:any=verifyReviewPayload(token)
  if(!p||p.taxpayerId!==id)return <main className="main"><h1>Quarterly update</h1><p>Review data is missing, invalid or has been altered.</p><Link className="btn" href={`/taxpayers/${id}/submissions`}>Return to Submission Centre</Link></main>
- const db=supabaseAdmin()
+ const db=supabaseAdmin();const workspace=await currentWorkspace();const firmId=workspace?.firmId||''
  const [{data:agentRows},{data:submissionRow}]=await Promise.all([
-  db.from('mtd_agent_authorisations').select('agent_id,expires_at,mtd_agents(agent_name,organisation_name,hmrc_arn,status)').eq('taxpayer_id',id).eq('status','authorised').eq('can_submit_quarterly',true),
-  qs.submissionId?db.from('hmrc_quarterly_submissions').select('id,status,response_payload,error_message,hmrc_correlation_id').eq('id',qs.submissionId).eq('taxpayer_id',id).maybeSingle():Promise.resolve({data:null} as any)
+  firmId?db.from('mtd_agent_authorisations').select('agent_id,expires_at,mtd_agents(agent_name,organisation_name,hmrc_arn,status)').eq('taxpayer_id',id).eq('firm_id',firmId).eq('status','authorised').eq('can_submit_quarterly',true):Promise.resolve({data:[]} as any),
+  qs.submissionId&&firmId?db.from('hmrc_quarterly_submissions').select('id,status,response_payload,error_message,hmrc_correlation_id').eq('id',qs.submissionId).eq('taxpayer_id',id).eq('firm_id',firmId).maybeSingle():Promise.resolve({data:null} as any)
  ])
  const activeAgents=(agentRows||[]).filter((r:any)=>(!r.expires_at||new Date(r.expires_at).getTime()>Date.now())&&(!r.mtd_agents?.status||r.mtd_agents.status==='active'))
  const activeAgentIds=activeAgents.map((r:any)=>r.agent_id).filter(Boolean)
- const {data:connectionRows}=activeAgentIds.length?await db.from('agent_hmrc_connections').select('agent_id,access_token,refresh_token').in('agent_id',activeAgentIds):{data:[] as any[]}
+ const {data:connectionRows}=activeAgentIds.length&&firmId?await db.from('agent_hmrc_connections').select('agent_id,access_token,refresh_token').eq('firm_id',firmId).in('agent_id',activeAgentIds):{data:[] as any[]}
  const connectedIds=new Set((connectionRows||[]).filter((r:any)=>r.access_token||r.refresh_token).map((r:any)=>String(r.agent_id)))
  const agents=activeAgents.filter((r:any)=>connectedIds.has(String(r.agent_id)))
  const defaultActingAgentId=agents.length===1?String(agents[0].agent_id):''

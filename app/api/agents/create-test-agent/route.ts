@@ -4,25 +4,26 @@ import { currentWorkspace } from '@/lib/workspace'
 
 export const dynamic = 'force-dynamic'
 
-const sandboxApiBase='https://test-api.service.hmrc.gov.uk'
-
 export async function POST(req: Request) {
   if (!isSameOriginRequest(req)) return new NextResponse('Invalid request origin', { status: 403 })
   const workspace=await currentWorkspace()
   if(!workspace)return NextResponse.json({error:'Accounting workspace access is not available.'},{status:403})
 
-  if (process.env.HMRC_ENVIRONMENT === 'production') {
+  if (process.env.HMRC_ENVIRONMENT === 'production' || process.env.HMRC_ENV === 'production' || process.env.NODE_ENV === 'production' && process.env.HMRC_BASE_URL?.includes('api.service.hmrc.gov.uk') && !process.env.HMRC_BASE_URL?.includes('test-api')) {
     return NextResponse.json({ error: 'Sandbox test user creation is disabled in production HMRC mode.' }, { status: 403 })
   }
 
   const clientId = process.env.HMRC_CLIENT_ID
   const clientSecret = process.env.HMRC_CLIENT_SECRET
+  const baseUrl = process.env.HMRC_BASE_URL || 'https://test-api.service.hmrc.gov.uk'
 
   if (!clientId || !clientSecret) {
     return NextResponse.json({ error: 'HMRC sandbox application credentials are not configured.' }, { status: 500 })
   }
 
-  const tokenResponse = await fetch(`${sandboxApiBase}/oauth/token`, {
+  // Create Test User is application-restricted. HMRC requires an OAuth 2.0
+  // client-credentials access token; the API call itself must use Bearer auth.
+  const tokenResponse = await fetch(`${baseUrl}/oauth/token`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     body: new URLSearchParams({
@@ -41,10 +42,11 @@ export async function POST(req: Request) {
     return NextResponse.json({
       error: tokenData?.error_description || tokenData?.message || tokenData?.error || `HMRC application token request returned ${tokenResponse.status}`,
       stage: 'application-token',
+      hmrc: tokenData,
     }, { status: tokenResponse.status || 502 })
   }
 
-  const response = await fetch(`${sandboxApiBase}/create-test-user/agents`, {
+  const response = await fetch(`${baseUrl}/create-test-user/agents`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -63,6 +65,7 @@ export async function POST(req: Request) {
     return NextResponse.json({
       error: data?.message || data?.error_description || data?.code || `HMRC returned ${response.status}`,
       stage: 'create-agent',
+      hmrc: data,
     }, { status: response.status })
   }
 

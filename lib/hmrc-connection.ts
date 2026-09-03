@@ -2,13 +2,6 @@ import { refreshAccessToken } from '@/lib/hmrc'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { currentWorkspace } from '@/lib/workspace'
 
-function currentHmrcEnvironment(){return process.env.HMRC_ENVIRONMENT==='production'?'production':'sandbox'}
-function assertConnectionEnvironment(conn:any){
-  const expected=currentHmrcEnvironment()
-  const stored=String(conn?.environment||'').trim().toLowerCase()
-  if(stored!==expected)throw new Error(`HMRC connection belongs to the ${stored||'unknown'} environment. Reconnect this HMRC account in the ${expected} environment before continuing.`)
-}
-
 async function taxpayerWorkspace(){
   const workspace=await currentWorkspace()
   if(!workspace)throw new Error('Accounting workspace access is not available')
@@ -30,7 +23,6 @@ async function assertAgentAccess(agentId:string){
 }
 
 async function refreshStoredToken(table:string,column:string,id:string,firmId:string,conn:any){
-  assertConnectionEnvironment(conn)
   if(!conn.refresh_token) throw new Error('HMRC session expired. Reconnect to HMRC.')
   const db=supabaseAdmin()
   const token=await refreshAccessToken(conn.refresh_token)
@@ -40,7 +32,6 @@ async function refreshStoredToken(table:string,column:string,id:string,firmId:st
     refresh_token:token.refresh_token||conn.refresh_token,
     token_expires_at:nextExpiresAt,
     scope:token.scope||conn.scope||null,
-    environment:currentHmrcEnvironment(),
     updated_at:new Date().toISOString()
   }).eq('firm_id',firmId).eq(column,id)
   if(updateError) throw new Error(`Could not save refreshed HMRC token: ${updateError.message}`)
@@ -52,7 +43,6 @@ export async function getValidHmrcAccessToken(taxpayerId:string){
   const db=supabaseAdmin()
   const {data:conn,error}=await db.from('hmrc_connections').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).maybeSingle()
   if(error||!conn?.access_token) throw new Error('Connect this taxpayer to HMRC first')
-  assertConnectionEnvironment(conn)
 
   const expiresAt=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0
   const needsRefresh=Boolean(expiresAt && expiresAt <= Date.now()+60_000)
@@ -67,7 +57,6 @@ export async function getValidAgentHmrcAccessToken(agentId:string){
   const db=supabaseAdmin()
   const {data:conn,error}=await db.from('agent_hmrc_connections').select('*').eq('firm_id',workspace.firmId).eq('agent_id',agentId).maybeSingle()
   if(error||!conn?.access_token) throw new Error('Connect this agent ASA to HMRC before filing for authorised clients.')
-  assertConnectionEnvironment(conn)
 
   const expiresAt=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0
   const needsRefresh=Boolean(expiresAt && expiresAt <= Date.now()+60_000)

@@ -3,6 +3,7 @@ import { signReviewPayload } from '@/lib/review-token'
 import { isSameOriginRequest } from '@/lib/request-security'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { quarterlySubmissionEligibility } from '@/lib/quarterly-submission-eligibility'
+import { currentWorkspace } from '@/lib/workspace'
 
 function money(value: FormDataEntryValue | null) {
   const n=Number(value||0)
@@ -19,6 +20,7 @@ const allowedIncomeSourceTypes=new Set(['self-employment','uk-property','foreign
 
 export async function POST(req: Request) {
   if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
+  const workspace=await currentWorkspace();if(!workspace)return new NextResponse('Accounting workspace access is not available',{status:403})
   const form=await req.formData()
   const taxpayerId=String(form.get('taxpayerId')||'demo')
   const requestedType=String(form.get('incomeSourceType')||form.get('filingType')||'self-employment')
@@ -31,13 +33,18 @@ export async function POST(req: Request) {
   back.searchParams.set('sourceType',incomeSourceType)
 
   const db=supabaseAdmin()
-  const [businessResult,obligationResult,submissionResult]=await Promise.all([
-    db.from('hmrc_businesses').select('business_id,business_type,raw').eq('taxpayer_id',taxpayerId).eq('business_id',businessId).maybeSingle(),
-    db.from('hmrc_obligations').select('taxpayer_id,business_id,period_start,period_end,status').eq('taxpayer_id',taxpayerId).eq('period_start',periodStart).eq('period_end',periodEnd),
-    db.from('hmrc_quarterly_submissions').select('taxpayer_id,business_id,period_start,period_end,status').eq('taxpayer_id',taxpayerId).eq('business_id',businessId).eq('period_start',periodStart).eq('period_end',periodEnd).in('status',['sending','submitted'])
+  const [taxpayerResult,businessResult,obligationResult,submissionResult]=await Promise.all([
+    db.from('taxpayers').select('id').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle(),
+    db.from('hmrc_businesses').select('business_id,business_type,raw').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).eq('business_id',businessId).maybeSingle(),
+    db.from('hmrc_obligations').select('taxpayer_id,business_id,period_start,period_end,status').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).eq('period_start',periodStart).eq('period_end',periodEnd),
+    db.from('hmrc_quarterly_submissions').select('taxpayer_id,business_id,period_start,period_end,status').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).eq('business_id',businessId).eq('period_start',periodStart).eq('period_end',periodEnd).in('status',['sending','submitted'])
   ])
-  if(businessResult.error||obligationResult.error||submissionResult.error){
+  if(taxpayerResult.error||businessResult.error||obligationResult.error||submissionResult.error){
     back.searchParams.set('error','Quarterly preparation checks are temporarily unavailable')
+    return NextResponse.redirect(back,303)
+  }
+  if(!taxpayerResult.data){
+    back.searchParams.set('error','Taxpayer is not available in this accounting workspace')
     return NextResponse.redirect(back,303)
   }
   const eligibility=quarterlySubmissionEligibility({taxpayerId,businessId,periodStart,periodEnd,requestedType:incomeSourceType,business:businessResult.data,obligations:obligationResult.data,submissions:submissionResult.data,allowFuturePeriod:true})

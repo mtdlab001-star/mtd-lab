@@ -4,6 +4,7 @@ import FraudContextFields from '@/app/components/FraudContextFields'
 import HmrcAttemptStatus from '@/app/components/HmrcAttemptStatus'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { latestHmrcAttempt, latestHmrcResponse } from '@/lib/hmrc-response-audit'
+import { currentWorkspace } from '@/lib/workspace'
 
 export const dynamic='force-dynamic'
 
@@ -28,8 +29,10 @@ export default async function TaxLiabilityPage({params,searchParams}:{params:Pro
  const {id}=await params
  const qs=await searchParams
  const db=supabaseAdmin()
- const {data:obligations}=await db.from('hmrc_obligations').select('period_start').eq('taxpayer_id',id).gte('period_start','2025-04-06')
- const years=Array.from(new Set((obligations||[]).map((o:any)=>{const y=Number(String(o.period_start).slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse()
+ const workspace=await currentWorkspace()
+ const firmId=workspace?.firmId||''
+ const {data:obligations}=firmId?await db.from('hmrc_obligations').select('period_start').eq('taxpayer_id',id).eq('firm_id',firmId).gte('period_start','2025-04-06'):{data:[] as any[]}
+ const years:string[]=Array.from(new Set<string>((obligations||[]).map((o:any)=>{const y=Number(String(o.period_start).slice(0,4));return `${y}-${String(y+1).slice(-2)}`}))).sort().reverse()
  const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27')
  const stored=await latestHmrcResponse(db,{taxpayerId:id,taxYear:selected,eventType:'tax_liability_retrieval'})
  const latestAttempt=await latestHmrcAttempt(db,{taxpayerId:id,taxYear:selected,eventType:'tax_liability_retrieval'})
