@@ -66,9 +66,8 @@ test('taxpayer and agent pages surface Supabase configuration failures',()=>{
 test('login rate limiting does not trap valid credentials behind stale failures',()=>{
   const route=readFileSync('app/api/auth/login/route.ts','utf8')
   const limiter=readFileSync('lib/login-rate-limit.ts','utf8')
-  assert.match(route,/const validUser=await constantTimeEqual\(username,expectedUser\)/)
-  assert.match(route,/const validPassword=await constantTimeEqual\(password,expectedPassword\)/)
-  assert.match(route,/if\(rateLimit\.limited&&\(!validUser\|\|!validPassword\)\)/)
+  assert.match(route,/valid=await constantTimeEqual\(password,expectedPassword\)/)
+  assert.match(route,/if\(rateLimit\.limited&&!valid\)/)
   assert.match(limiter,/\.eq\('reason', 'invalid_credentials'\)\.eq\('ip_hash'/)
   assert.match(limiter,/\.eq\('reason', 'invalid_credentials'\)\.eq\('username_hash'/)
 })

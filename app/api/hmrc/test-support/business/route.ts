@@ -3,6 +3,8 @@ import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { isSameOriginRequest } from '@/lib/request-security'
 import { supabaseAdmin } from '@/lib/supabase-admin'
+import { currentWorkspace } from '@/lib/workspace'
+import { buildFraudHeaders } from '@/lib/hmrc-fraud'
 
 const allowedPropertyTypes=new Set(['uk-property','foreign-property'])
 
@@ -12,6 +14,8 @@ function backUrl(req:Request,taxpayerId:string){
 
 export async function POST(req:Request){
   if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
+  const workspace=await currentWorkspace()
+  if(!workspace)return new NextResponse('Accounting workspace access is not available',{status:403})
   const form=await req.formData()
   const taxpayerId=String(form.get('taxpayerId')||'').trim()
   const businessType=String(form.get('businessType')||'').trim()
@@ -28,15 +32,18 @@ export async function POST(req:Request){
 
   try{
     const db=supabaseAdmin()
-    const {data:taxpayer,error}=await db.from('taxpayers').select('nino').eq('id',taxpayerId).maybeSingle()
-    if(error||!taxpayer?.nino)throw new Error('The taxpayer NINO is not available.')
+    const {data:taxpayer,error}=await db.from('taxpayers').select('nino').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle()
+    if(error||!taxpayer?.nino)throw new Error('The taxpayer is not available in this accounting workspace or has no NINO.')
     const accessToken=await getValidHmrcAccessToken(taxpayerId)
+    const fraud=buildFraudHeaders(req,form,taxpayerId)
+    if(fraud.missing.length)throw new Error(`Missing HMRC fraud prevention data: ${fraud.missing.join(', ')}`)
     const response=await fetch(`${hmrcApiBase}/individuals/self-assessment-test-support/business/${encodeURIComponent(taxpayer.nino)}`,{
       method:'POST',
       headers:{
         Authorization:`Bearer ${accessToken}`,
         Accept:'application/vnd.hmrc.1.0+json',
-        'Content-Type':'application/json'
+        'Content-Type':'application/json',
+        ...fraud.headers
       },
       body:JSON.stringify({typeOfBusiness:businessType}),
       cache:'no-store'

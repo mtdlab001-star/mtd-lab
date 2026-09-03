@@ -8,7 +8,7 @@ test('help centre is public, searchable and linked from sign in',()=>{
   const help=readFileSync('app/help/HelpCentre.tsx','utf8')
   const forgot=readFileSync('app/forgot-password/page.tsx','utf8')
 
-  assert.match(middleware,/const publicPages=new Set\(\['\/login','\/help','\/forgot-password'\]\)/)
+  assert.match(middleware,/const publicPages=new Set\(\['\/login','\/register','\/help','\/forgot-password'\]\)/)
   assert.match(middleware,/publicPages\.has\(path\)/)
   assert.match(login,/href="\/help"/)
   assert.match(login,/href="\/forgot-password"/)
