@@ -1,5 +1,11 @@
+import { currentWorkspace } from '@/lib/workspace'
+
+async function firmId(){const workspace=await currentWorkspace();return workspace?.firmId||''}
+
 export async function recordHmrcResponse(db:any,args:{taxpayerId:string;taxYear:string;eventType:string;status:'accepted'|'rejected';payload:any;correlationId?:string|null;hmrcStatus?:number|null;requestSummary?:Record<string,any>}){
+  const workspaceFirmId=await firmId();if(!workspaceFirmId)return ''
   const {data,error}=await db.from('mtd_submission_audit').insert({
+    firm_id:workspaceFirmId,
     taxpayer_id:args.taxpayerId,
     tax_year:args.taxYear,
     event_type:args.eventType,
@@ -15,7 +21,8 @@ export async function recordHmrcResponse(db:any,args:{taxpayerId:string;taxYear:
 }
 
 export async function latestHmrcResponse(db:any,args:{taxpayerId:string;taxYear:string;eventType:string;requestKey?:string;requestValue?:string}){
-  let query=db.from('mtd_submission_audit').select('id,response_summary,response_payload,hmrc_correlation_id,created_at,request_summary').eq('taxpayer_id',args.taxpayerId).eq('tax_year',args.taxYear).eq('event_type',args.eventType).eq('status','accepted').order('created_at',{ascending:false}).limit(10)
+  const workspaceFirmId=await firmId();if(!workspaceFirmId)return null
+  const query=db.from('mtd_submission_audit').select('id,response_summary,response_payload,hmrc_correlation_id,created_at,request_summary').eq('firm_id',workspaceFirmId).eq('taxpayer_id',args.taxpayerId).eq('tax_year',args.taxYear).eq('event_type',args.eventType).eq('status','accepted').order('created_at',{ascending:false}).limit(10)
   const {data}=await query
   const rows=data||[]
   const requestKey=args.requestKey
@@ -24,8 +31,10 @@ export async function latestHmrcResponse(db:any,args:{taxpayerId:string;taxYear:
 }
 
 export async function latestHmrcAttempt(db:any,args:{taxpayerId:string;taxYear:string;eventType:string;requestKey?:string;requestValue?:string}){
+  const workspaceFirmId=await firmId();if(!workspaceFirmId)return null
   const {data}=await db.from('mtd_submission_audit')
     .select('id,status,hmrc_status,response_summary,response_payload,hmrc_correlation_id,created_at,request_summary')
+    .eq('firm_id',workspaceFirmId)
     .eq('taxpayer_id',args.taxpayerId)
     .eq('tax_year',args.taxYear)
     .eq('event_type',args.eventType)
