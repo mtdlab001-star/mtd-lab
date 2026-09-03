@@ -1,8 +1,10 @@
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { listMtdIncomeSources, type MtdIncomeSourceRecord } from '@/lib/mtd-income-sources-server'
 import type { MtdIncomeSourceType } from '@/lib/mtd-income-source'
+import { currentWorkspace } from '@/lib/workspace'
 
 export const dynamic='force-dynamic'
 function decodeIssues(value?:string){try{return value?JSON.parse(Buffer.from(value,'base64url').toString('utf8')):[]}catch{return []}}
@@ -16,10 +18,14 @@ const laneMeta:Record<MtdIncomeSourceType,{label:string;subtitle:string;descript
 export default async function Page({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
  const {id}=await params
  const q=await searchParams
+ const workspace=await currentWorkspace()
+ if(!workspace)notFound()
  const importIssues:any[]=decodeIssues(q.importIssues)
  const db=supabaseAdmin()
+ const {data:taxpayer}=await db.from('taxpayers').select('id').eq('id',id).eq('firm_id',workspace.firmId).maybeSingle()
+ if(!taxpayer)notFound()
  let sources:MtdIncomeSourceRecord[]
- try{sources=await listMtdIncomeSources(db,id)}catch{sources=[]}
+ try{sources=await listMtdIncomeSources(db,id,workspace.firmId)}catch{sources=[]}
  const canonicalRequestedType=q.sourceType==='property'?'uk-property':q.sourceType
  const requestedType=(['self-employment','uk-property','foreign-property'].includes(String(canonicalRequestedType))?canonicalRequestedType:'self-employment') as MtdIncomeSourceType
  const availableTypes=(['self-employment','uk-property','foreign-property'] as MtdIncomeSourceType[]).filter(sourceType=>sources.some(source=>source.sourceType===sourceType))
@@ -28,7 +34,7 @@ export default async function Page({params,searchParams}:{params:Promise<{id:str
  const laneSources=sources.filter(source=>source.sourceType===selectedType)
  const selectedSource=requestedSource?.sourceType===selectedType?requestedSource:laneSources[0]
  const recordType=['income','expense'].includes(String(q.recordType))?String(q.recordType):'all'
- let query=db.from('mtd_digital_records').select('*').eq('taxpayer_id',id).order('transaction_date',{ascending:false}).limit(250)
+ let query=db.from('mtd_digital_records').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).order('transaction_date',{ascending:false}).limit(250)
  if(selectedSource)query=query.eq('business_id',selectedSource.businessId)
  else query=query.eq('business_id','__no_income_source__')
  if(recordType!=='all')query=query.eq('record_type',recordType)
