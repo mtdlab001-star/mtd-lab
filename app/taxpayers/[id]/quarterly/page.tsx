@@ -1,8 +1,10 @@
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import { mergeMtdIncomeSources } from '@/lib/mtd-income-sources-server'
 import { quarterlyPeriodIsAvailable } from '@/lib/quarterly-submission-eligibility'
+import { currentWorkspace } from '@/lib/workspace'
 
 export const dynamic='force-dynamic'
 
@@ -31,11 +33,13 @@ function visualStatus(o:any,submission?:any){
     if(Number.isFinite(age)&&age>=0&&age<1000*60*15)return {label:'Accepted, awaiting HMRC update',cls:'statusDone',accepted:true}
     return {label:'Accepted, obligation still open',cls:'statusOpen',accepted:true}
   }
+  const periodAvailable=quarterlyPeriodIsAvailable(String(o.period_end||''))
+  if(!periodAvailable)return {label:'Not Due Yet',cls:'statusOpen',accepted:false}
   const due=o.due_date?new Date(`${o.due_date}T23:59:59Z`):null
   const now=new Date()
   if(due&&due<now)return {label:'Overdue',cls:'statusError',accepted:false}
   if(due&&due.getTime()-now.getTime()<1000*60*60*24*30)return {label:'Due soon',cls:'statusOpen',accepted:false}
-  return {label:'Not due yet',cls:'statusOpen',accepted:false}
+  return {label:'Due',cls:'statusOpen',accepted:false}
 }
 
 function cumulative(records:any[],businessId:string,periodEnd:string,type:string){
@@ -129,13 +133,16 @@ function MoneyField({name,label,value,required=false}:{name:string,label:string,
 export default async function QuarterlyPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
   const {id}=await params
   const qs=await searchParams
+  const workspace=await currentWorkspace()
+  if(!workspace)notFound()
   const db=supabaseAdmin()
   const [{data:taxpayer},{data:businesses},{data:obligations},{data:submissions}]=await Promise.all([
-    db.from('taxpayers').select('*').eq('id',id).maybeSingle(),
-    db.from('hmrc_businesses').select('*').eq('taxpayer_id',id).order('created_at'),
-    db.from('hmrc_obligations').select('*').eq('taxpayer_id',id).gte('period_start','2025-04-06').order('period_end'),
-    db.from('hmrc_quarterly_submissions').select('*').eq('taxpayer_id',id).order('created_at',{ascending:false})
+    db.from('taxpayers').select('*').eq('id',id).eq('firm_id',workspace.firmId).maybeSingle(),
+    db.from('hmrc_businesses').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).order('created_at'),
+    db.from('hmrc_obligations').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).gte('period_start','2025-04-06').order('period_end'),
+    db.from('hmrc_quarterly_submissions').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).order('created_at',{ascending:false})
   ])
+  if(!taxpayer)notFound()
 
   const sources=mergeMtdIncomeSources(businesses||[],obligations||[])
   const availableTypes=(['self-employment','uk-property','foreign-property'] as const).filter(sourceType=>sources.some(source=>source.sourceType===sourceType))
@@ -154,7 +161,7 @@ export default async function QuarterlyPage({params,searchParams}:{params:Promis
     ? rows.find((o:any)=>o.period_end===selectedPeriodEnd&&String(o.status).toLowerCase()==='open')
     : null
   const {data:digitalRecords}=selectedObligation&&selectedBusiness
-    ? await db.from('mtd_digital_records').select('*').eq('taxpayer_id',id).eq('business_id',selectedBusiness).lte('transaction_date',selectedObligation.period_end).order('transaction_date')
+    ? await db.from('mtd_digital_records').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).eq('business_id',selectedBusiness).lte('transaction_date',selectedObligation.period_end).order('transaction_date')
     : ({data:[]} as any)
   const quarterRows=rows.map((o:any,index:number)=>({o,quarter:index+1,submission:latestSubmission(o.period_end)}))
   const acceptedPending=quarterRows.filter((x:any)=>String(x.o.status).toLowerCase()!=='fulfilled'&&x.submission?.status==='submitted').length
