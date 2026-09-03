@@ -12,6 +12,7 @@ import { currentWorkspace } from '@/lib/workspace'
 
 function firstValue(obj:any,keys:string[]){for(const key of keys){const value=obj?.[key];if(value!==undefined&&value!==null&&value!=='')return value}return null}
 function throwIfError(error:any,context:string){if(error)throw new Error(`${context}: ${error.message||JSON.stringify(error)}`)}
+function validNino(value:string){return /^[A-Z]{2}\d{6}[A-D]$/.test(value)}
 
 function currentUkTaxYearRange(){
   const now=new Date()
@@ -53,12 +54,14 @@ export async function POST(req:Request){
   const {data:ownedTaxpayer}=await db.from('taxpayers').select('id').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle()
   if(!ownedTaxpayer)return NextResponse.redirect(new URL('/taxpayers?error=Taxpayer%20workspace%20not%20found',req.url),303)
   try{
+    if(!validNino(nino))throw new Error('Enter a valid NINO before syncing with HMRC.')
     const fraud=buildFraudHeaders(req,form,taxpayerId)
     if(fraud.missing.length)throw new Error(`Missing HMRC fraud prevention data: ${fraud.missing.join(', ')}`)
     const actingAgentId=requestedAgentId?await resolveConnectedAgentForPermission(taxpayerId,'can_view_obligations',requestedAgentId):null
     if(requestedAgentId&&!actingAgentId)throw new Error('The selected agent is not connected or authorised to view this taxpayer’s HMRC obligations.')
     const accessToken=await getHmrcAccessTokenForActingCapacity(taxpayerId,actingAgentId)
-    const {error:taxpayerError}=await db.from('taxpayers').update({nino,mtditid,updated_at:new Date().toISOString()}).eq('id',taxpayerId).eq('firm_id',workspace.firmId)
+    const taxpayerUpdate:any={nino,updated_at:new Date().toISOString()};if(mtditid)taxpayerUpdate.mtditid=mtditid
+    const {error:taxpayerError}=await db.from('taxpayers').update(taxpayerUpdate).eq('id',taxpayerId).eq('firm_id',workspace.firmId)
     throwIfError(taxpayerError,'Taxpayer update failed')
 
     const businessPath=`/individuals/business/details/${encodeURIComponent(nino)}/list`
