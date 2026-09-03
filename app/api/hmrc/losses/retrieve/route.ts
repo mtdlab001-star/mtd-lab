@@ -5,9 +5,11 @@ import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
 import { isSameOriginRequest } from '@/lib/request-security'
 import { recordHmrcResponse } from '@/lib/hmrc-response-audit'
+import { currentWorkspace } from '@/lib/workspace'
 
 export async function POST(req:Request){
  if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
+ const workspace=await currentWorkspace();if(!workspace)return new NextResponse('Accounting workspace access is not available',{status:403})
  const form=await req.formData()
  const taxpayerId=String(form.get('taxpayerId')||'demo')
  const taxYear=String(form.get('taxYear')||'')
@@ -15,8 +17,11 @@ export async function POST(req:Request){
  const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/end-of-year/adjustments`,req.url)
  back.searchParams.set('taxYear',taxYear);back.searchParams.set('lossBusinessId',businessId)
  if(!/^20\d{2}-\d{2}$/.test(taxYear)||!businessId){back.searchParams.set('error','Tax year and business are required');return NextResponse.redirect(back,303)}
- const db=supabaseAdmin();const {data:taxpayer}=await db.from('taxpayers').select('nino').eq('id',taxpayerId).maybeSingle()
- if(!taxpayer?.nino){back.searchParams.set('error','Taxpayer NINO is missing');return NextResponse.redirect(back,303)}
+ const db=supabaseAdmin();const [{data:taxpayer},{data:business}]=await Promise.all([
+  db.from('taxpayers').select('nino').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle(),
+  db.from('hmrc_businesses').select('id').eq('taxpayer_id',taxpayerId).eq('firm_id',workspace.firmId).eq('business_id',businessId).maybeSingle()
+ ])
+ if(!taxpayer?.nino||!business){back.searchParams.set('error','Taxpayer or HMRC business is not available in this accounting workspace');return NextResponse.redirect(back,303)}
  let token:string
  try{token=await getValidHmrcAccessToken(taxpayerId)}catch(e:any){back.searchParams.set('error',e.message||'HMRC connection is incomplete');return NextResponse.redirect(back,303)}
  const fraud=buildFraudHeaders(req,form,taxpayerId)
