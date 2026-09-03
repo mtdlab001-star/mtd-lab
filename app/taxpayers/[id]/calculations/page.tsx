@@ -24,10 +24,15 @@ export default async function CalculationsPage({params,searchParams}:{params:Pro
     db.from('hmrc_businesses').select('id',{count:'exact',head:true}).eq('taxpayer_id',id).eq('firm_id',workspace.firmId),
     db.from('hmrc_obligations').select('period_start,period_end,status').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).gte('period_start','2025-04-06'),
     db.from('hmrc_quarterly_submissions').select('tax_year,status').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).eq('status','submitted'),
-    db.from('mtd_agent_authorisations').select('agent_id,expires_at,mtd_agents(agent_name,organisation_name,hmrc_arn,status)').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).eq('status','authorised').eq('can_submit_final_declaration',true)
+    db.from('mtd_agent_authorisations').select('agent_id,expires_at').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).eq('status','authorised').eq('can_submit_final_declaration',true)
   ])
   if(!taxpayer)redirect('/taxpayers')
-  const finalAgents=(agentRows||[]).filter((r:any)=>(!r.expires_at||new Date(r.expires_at).getTime()>Date.now())&&(!r.mtd_agents?.status||r.mtd_agents.status==='active'))
+  const finalAgentIds=Array.from(new Set((agentRows||[]).map((r:any)=>String(r.agent_id||'')).filter(Boolean)))
+  const {data:finalAgentRecords,error:finalAgentRecordsError}=finalAgentIds.length?await db.from('mtd_agents').select('id,agent_name,organisation_name,hmrc_arn,status').eq('firm_id',workspace.firmId).in('id',finalAgentIds):{data:[] as any[],error:null}
+  if(finalAgentRecordsError)throw finalAgentRecordsError
+  const finalAgentById=new Map((finalAgentRecords||[]).map((agent:any)=>[String(agent.id),agent]))
+  const finalAgentRows=(agentRows||[]).map((row:any)=>({...row,mtd_agents:finalAgentById.get(String(row.agent_id))||null}))
+  const finalAgents=finalAgentRows.filter((r:any)=>(!r.expires_at||new Date(r.expires_at).getTime()>Date.now())&&r.mtd_agents?.status==='active')
   const selectedActingAgentId=finalAgents.some((r:any)=>r.agent_id===qs.actingAgentId)?String(qs.actingAgentId):''
   const years=Array.from(new Set([...(obligations||[]).map((o:any)=>taxYearFromDate(o.period_start)),...(submissions||[]).map((s:any)=>s.tax_year).filter(Boolean)])).sort().reverse()
   const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27')
