@@ -1,6 +1,8 @@
+import { notFound } from 'next/navigation'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { expireAgentAuthorisations } from '@/lib/agent-authorisation'
+import { currentWorkspace } from '@/lib/workspace'
 
 export const dynamic='force-dynamic'
 function fmt(v?:string|null){if(!v)return 'Not set';const d=new Date(v);return Number.isNaN(d.getTime())?v:d.toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
@@ -9,6 +11,8 @@ function isActive(r:any){return effectiveStatus(r)==='authorised'}
 
 export default async function AgentAuthorisationPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
   const {id}=await params;const qs=await searchParams
+  const workspace=await currentWorkspace()
+  if(!workspace)notFound()
   let taxpayer:any=null
   let rows:any[]=[]
   let agentConnections:any[]=[]
@@ -16,14 +20,16 @@ export default async function AgentAuthorisationPage({params,searchParams}:{para
   try{
     const db=supabaseAdmin();try{await expireAgentAuthorisations(id)}catch{}
     const [{data:taxpayerRow},{data:links},{data:connections}]=await Promise.all([
-      db.from('taxpayers').select('id,display_name,nino').eq('id',id).maybeSingle(),
-      db.from('mtd_agent_authorisations').select('*,mtd_agents(*)').eq('taxpayer_id',id).order('created_at',{ascending:false}),
-      db.from('agent_hmrc_connections').select('agent_id,connected_at,token_expires_at')
+      db.from('taxpayers').select('id,display_name,nino').eq('id',id).eq('firm_id',workspace.firmId).maybeSingle(),
+      db.from('mtd_agent_authorisations').select('*,mtd_agents(*)').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).order('created_at',{ascending:false}),
+      db.from('agent_hmrc_connections').select('agent_id,connected_at,token_expires_at').eq('firm_id',workspace.firmId)
     ])
+    if(!taxpayerRow)notFound()
     taxpayer=taxpayerRow
     rows=links||[]
     agentConnections=connections||[]
   }catch(error:any){
+    if(error?.digest?.startsWith?.('NEXT_NOT_FOUND'))throw error
     unavailable=error?.message||'Database configuration is temporarily unavailable.'
   }
   const connectionByAgent=new Map((agentConnections||[]).map((c:any)=>[c.agent_id,c]))
