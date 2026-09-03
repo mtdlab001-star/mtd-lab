@@ -11,11 +11,11 @@ export function mergeMtdIncomeSources(businesses:any[],obligations:any[]):MtdInc
   return Array.from(sources.values()).sort((a,b)=>order[a.sourceType]-order[b.sourceType]||String(a.businessName||a.businessId).localeCompare(String(b.businessName||b.businessId)))
 }
 
-export async function listMtdIncomeSources(db:any,taxpayerId:string):Promise<MtdIncomeSourceRecord[]>{
-  const [{data:businesses,error:businessError},{data:obligations,error:obligationError}]=await Promise.all([
-    db.from('hmrc_businesses').select('business_id,business_type,business_name,raw').eq('taxpayer_id',taxpayerId),
-    db.from('hmrc_obligations').select('business_id').eq('taxpayer_id',taxpayerId).not('business_id','is',null)
-  ])
+export async function listMtdIncomeSources(db:any,taxpayerId:string,firmId?:string):Promise<MtdIncomeSourceRecord[]>{
+  let businessesQuery=db.from('hmrc_businesses').select('business_id,business_type,business_name,raw').eq('taxpayer_id',taxpayerId)
+  let obligationsQuery=db.from('hmrc_obligations').select('business_id').eq('taxpayer_id',taxpayerId).not('business_id','is',null)
+  if(firmId){businessesQuery=businessesQuery.eq('firm_id',firmId);obligationsQuery=obligationsQuery.eq('firm_id',firmId)}
+  const [{data:businesses,error:businessError},{data:obligations,error:obligationError}]=await Promise.all([businessesQuery,obligationsQuery])
   if(businessError)throw businessError
   if(obligationError)throw obligationError
   return mergeMtdIncomeSources(businesses||[],obligations||[])
