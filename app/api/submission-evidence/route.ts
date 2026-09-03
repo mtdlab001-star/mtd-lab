@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { isSameOriginRequest } from '@/lib/request-security'
 import { incomeSourceTypeFromBusinessId, type MtdIncomeSourceType } from '@/lib/mtd-income-source'
 import { quarterlyEvidenceDetail } from '@/lib/submission-evidence'
+import { currentWorkspace, taxpayerBelongsToWorkspace } from '@/lib/workspace'
 
 function esc(v:any){return String(v??'').replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]||c))}
 function taxYearEnded(taxYear:string){const start=Number(taxYear.slice(0,4));return Number.isFinite(start)&&Date.now()>=Date.UTC(start+1,3,6)}
@@ -12,19 +13,22 @@ function reconciliationStatus(r:any,obligations:any[]){if(r.status!=='submitted'
 
 export async function GET(req:Request){
  if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
+ const workspace=await currentWorkspace()
+ if(!workspace)return new NextResponse('Accounting workspace access is not available',{status:401})
  const u=new URL(req.url);const taxpayerId=String(u.searchParams.get('taxpayerId')||'');const taxYear=String(u.searchParams.get('taxYear')||'')
  if(!taxpayerId||!/^20\d{2}-\d{2}$/.test(taxYear))return new NextResponse('Taxpayer and tax year are required',{status:400})
+ if(!await taxpayerBelongsToWorkspace(taxpayerId,workspace))return new NextResponse('Taxpayer not found',{status:404})
  const db=supabaseAdmin();const startYear=Number(taxYear.slice(0,4))
  const [{data:taxpayer},{data:audit},{data:quarterly},{data:obligations}]=await Promise.all([
-  db.from('taxpayers').select('display_name,nino').eq('id',taxpayerId).maybeSingle(),
-  db.from('mtd_submission_audit').select('*').eq('taxpayer_id',taxpayerId).eq('tax_year',taxYear).order('created_at',{ascending:true}),
-  db.from('hmrc_quarterly_submissions').select('*').eq('taxpayer_id',taxpayerId).eq('tax_year',taxYear).order('created_at',{ascending:true}),
-  db.from('hmrc_obligations').select('business_id,period_start,period_end,status,received_date').eq('taxpayer_id',taxpayerId).gte('period_start',`${startYear}-04-06`).lte('period_end',`${startYear+1}-04-05`)
+  db.from('taxpayers').select('display_name,nino').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle(),
+  db.from('mtd_submission_audit').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).eq('tax_year',taxYear).order('created_at',{ascending:true}),
+  db.from('hmrc_quarterly_submissions').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).eq('tax_year',taxYear).order('created_at',{ascending:true}),
+  db.from('hmrc_obligations').select('business_id,period_start,period_end,status,received_date').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).gte('period_start',`${startYear}-04-06`).lte('period_end',`${startYear+1}-04-05`)
  ])
  if(!taxpayer)return new NextResponse('Taxpayer not found',{status:404})
  const agentIds=Array.from(new Set([...(quarterly||[]).map((r:any)=>r.acting_agent_id),...(audit||[]).map((r:any)=>r.acting_agent_id)].filter(Boolean)))
  let agents=new Map<string,any>()
- if(agentIds.length){const {data:agentRows}=await db.from('mtd_agents').select('id,agent_name,organisation_name,hmrc_arn').in('id',agentIds);agents=new Map((agentRows||[]).map((a:any)=>[a.id,a]))}
+ if(agentIds.length){const {data:agentRows}=await db.from('mtd_agents').select('id,agent_name,organisation_name,hmrc_arn').eq('firm_id',workspace.firmId).in('id',agentIds);agents=new Map((agentRows||[]).map((a:any)=>[a.id,a]))}
  const actor=(r:any)=>{if(!r.acting_agent_id)return 'Direct';const a:any=agents.get(r.acting_agent_id);if(!a)return 'Authorised agent';return `Authorised agent: ${a.agent_name}${a.organisation_name?` (${a.organisation_name})`:''}${a.hmrc_arn?` · ARN ${a.hmrc_arn}`:''}`}
  const obs=obligations||[]
  const quarterlyRows=quarterly||[]
