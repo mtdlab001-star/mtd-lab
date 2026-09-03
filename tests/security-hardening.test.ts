@@ -125,6 +125,8 @@ test('delegated HMRC filing uses the authorised agent ASA connection',()=>{
   assert.match(connection,/agent_hmrc_connections/)
   assert.match(connection,/getValidAgentHmrcAccessToken/)
   assert.match(connection,/getHmrcAccessTokenForActingCapacity/)
+  assert.match(connection,/assertConnectionEnvironment\(conn\)/)
+  assert.match(connection,/environment:currentHmrcEnvironment\(\)/)
 
   const quarterlyRoute=readFileSync('app/api/hmrc/quarterly/submit/route.ts','utf8')
   const finalRoute=readFileSync('app/api/hmrc/calculations/final-declaration/route.ts','utf8')
