@@ -3,6 +3,7 @@ import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getValidAgentHmrcAccessToken } from '@/lib/hmrc-connection'
 import { hmrcApiBase } from '@/lib/hmrc'
 import { isSameOriginRequest } from '@/lib/request-security'
+import { currentWorkspace } from '@/lib/workspace'
 
 const ACCEPT_V1='application/vnd.hmrc.1.0+json'
 const ACCEPT_V2='application/vnd.hmrc.2.0+json'
@@ -14,6 +15,8 @@ async function jsonOrEmpty(res:Response){const text=await res.text();if(!text)re
 
 export async function POST(req:Request){
   if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
+  const workspace=await currentWorkspace()
+  if(!workspace)return new NextResponse('Accounting workspace access is not available',{status:403})
   const form=await req.formData()
   const taxpayerId=String(form.get('taxpayerId')||'').trim()
   const agentId=String(form.get('agentId')||'').trim()
@@ -27,14 +30,14 @@ export async function POST(req:Request){
   const db=supabaseAdmin()
   try{
     const [{data:taxpayer,error:taxpayerError},{data:agent,error:agentError},{data:authorisation,error:authError},{data:connection,error:connectionError}]=await Promise.all([
-      db.from('taxpayers').select('nino').eq('id',taxpayerId).maybeSingle(),
-      db.from('mtd_agents').select('hmrc_arn,status').eq('id',agentId).maybeSingle(),
-      db.from('mtd_agent_authorisations').select('status,revoked_at,expires_at').eq('taxpayer_id',taxpayerId).eq('agent_id',agentId).maybeSingle(),
-      db.from('agent_hmrc_connections').select('scope,connected_at').eq('agent_id',agentId).maybeSingle()
+      db.from('taxpayers').select('nino').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle(),
+      db.from('mtd_agents').select('hmrc_arn,status').eq('id',agentId).eq('firm_id',workspace.firmId).maybeSingle(),
+      db.from('mtd_agent_authorisations').select('status,revoked_at,expires_at').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).eq('agent_id',agentId).maybeSingle(),
+      db.from('agent_hmrc_connections').select('scope,connected_at').eq('firm_id',workspace.firmId).eq('agent_id',agentId).maybeSingle()
     ])
     if(taxpayerError)throw taxpayerError;if(agentError)throw agentError;if(authError)throw authError;if(connectionError)throw connectionError
-    if(!taxpayer?.nino)throw new Error('This taxpayer does not have a NINO recorded.')
-    if(!agent?.hmrc_arn)throw new Error('This agent does not have an HMRC Agent Reference Number recorded.')
+    if(!taxpayer?.nino)throw new Error('This taxpayer is not available in this accounting workspace or does not have a NINO recorded.')
+    if(!agent?.hmrc_arn)throw new Error('This agent is not available in this accounting workspace or does not have an HMRC Agent Reference Number recorded.')
     if(agent.status&&agent.status!=='active')throw new Error('This agent is inactive in MTD Lab.')
     if(!authorisation||authorisation.status!=='authorised'||authorisation.revoked_at)throw new Error('This agent is not authorised for this taxpayer inside MTD Lab.')
     if(authorisation.expires_at&&new Date(authorisation.expires_at).getTime()<=Date.now())throw new Error('This MTD Lab agent authorisation has expired.')
