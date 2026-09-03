@@ -3,6 +3,7 @@ import { hmrcGet } from '@/lib/hmrc'
 import { getHmrcAccessTokenForActingCapacity } from '@/lib/hmrc-connection'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
+import { buildFraudHeaders } from '@/lib/hmrc-fraud'
 import { isSameOriginRequest } from '@/lib/request-security'
 import { resolveConnectedAgentForPermission } from '@/lib/agent-authorisation'
 import { hmrcBusinessType, mergeBusinessPayloads } from '@/lib/hmrc-businesses'
@@ -52,6 +53,8 @@ export async function POST(req:Request){
   const {data:ownedTaxpayer}=await db.from('taxpayers').select('id').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle()
   if(!ownedTaxpayer)return NextResponse.redirect(new URL('/taxpayers?error=Taxpayer%20workspace%20not%20found',req.url),303)
   try{
+    const fraud=buildFraudHeaders(req,form,taxpayerId)
+    if(fraud.missing.length)throw new Error(`Missing HMRC fraud prevention data: ${fraud.missing.join(', ')}`)
     const actingAgentId=requestedAgentId?await resolveConnectedAgentForPermission(taxpayerId,'can_view_obligations',requestedAgentId):null
     if(requestedAgentId&&!actingAgentId)throw new Error('The selected agent is not connected or authorised to view this taxpayer’s HMRC obligations.')
     const accessToken=await getHmrcAccessTokenForActingCapacity(taxpayerId,actingAgentId)
@@ -61,8 +64,8 @@ export async function POST(req:Request){
     const businessPath=`/individuals/business/details/${encodeURIComponent(nino)}/list`
     const businessAccept=hmrcAcceptHeader('businessDetails')
     const businessPayloads:any[]=[]
-    if(process.env.HMRC_ENVIRONMENT!=='production'){try{businessPayloads.push(await hmrcGet(businessPath,accessToken,businessAccept,'STATEFUL'))}catch{}}
-    businessPayloads.push(await hmrcGet(businessPath,accessToken,businessAccept,'DEFAULT'))
+    if(process.env.HMRC_ENVIRONMENT!=='production'){try{businessPayloads.push(await hmrcGet(businessPath,accessToken,businessAccept,'STATEFUL',fraud.headers))}catch{}}
+    businessPayloads.push(await hmrcGet(businessPath,accessToken,businessAccept,'DEFAULT',fraud.headers))
     const list=mergeBusinessPayloads(businessPayloads)
     const {error:deleteBusinessesError}=await db.from('hmrc_businesses').delete().eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId)
     throwIfError(deleteBusinessesError,'Deleting existing businesses failed')
@@ -73,9 +76,9 @@ export async function POST(req:Request){
     let obligations:any=null
     let all:any[]=[]
     const obligationsAccept=hmrcAcceptHeader('obligations')
-    if(process.env.HMRC_ENVIRONMENT!=='production'){try{obligations=await hmrcGet(currentPath,accessToken,obligationsAccept,'DYNAMIC');all=flattenObligations(obligations)}catch{}}
-    if(!hasModernObligation(all)){try{obligations=await hmrcGet(currentPath,accessToken,obligationsAccept,'DEFAULT');all=flattenObligations(obligations)}catch{}}
-    if(!hasModernObligation(all)&&process.env.HMRC_ENVIRONMENT!=='production'){obligations=await hmrcGet(`/obligations/details/${encodeURIComponent(nino)}/income-and-expenditure`,accessToken,obligationsAccept,'DEFAULT');all=flattenObligations(obligations)}
+    if(process.env.HMRC_ENVIRONMENT!=='production'){try{obligations=await hmrcGet(currentPath,accessToken,obligationsAccept,'DYNAMIC',fraud.headers);all=flattenObligations(obligations)}catch{}}
+    if(!hasModernObligation(all)){try{obligations=await hmrcGet(currentPath,accessToken,obligationsAccept,'DEFAULT',fraud.headers);all=flattenObligations(obligations)}catch{}}
+    if(!hasModernObligation(all)&&process.env.HMRC_ENVIRONMENT!=='production'){obligations=await hmrcGet(`/obligations/details/${encodeURIComponent(nino)}/income-and-expenditure`,accessToken,obligationsAccept,'DEFAULT',fraud.headers);all=flattenObligations(obligations)}
 
     const reconciledObligations=reconcileSandboxObligationBusinessIds(all,list,process.env.HMRC_ENVIRONMENT)
     const uniqueObligations=dedupeObligations(reconciledObligations)
