@@ -51,13 +51,14 @@ export async function refreshAccessToken(refreshToken: string) {
   }))
 }
 
-export async function hmrcGet(path: string, accessToken: string, accept: string, sandboxScenario?: string) {
+export async function hmrcGet(path: string, accessToken: string, accept: string, sandboxScenario?: string, extraHeaders:Record<string,string>={}) {
   const scenario = sandboxScenario || process.env.HMRC_TEST_SCENARIO || 'DEFAULT'
   const res = await fetch(`${hmrcApiBase}${path}`, {
     headers: {
       Authorization: `Bearer ${accessToken}`,
       Accept: accept,
-      ...(isLive ? {} : { 'Gov-Test-Scenario': scenario })
+      ...(isLive ? {} : { 'Gov-Test-Scenario': scenario }),
+      ...extraHeaders
     },
     cache: 'no-store'
   })
