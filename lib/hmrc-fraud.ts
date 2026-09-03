@@ -1,18 +1,26 @@
 function enc(value:string){return encodeURIComponent(value)}
 
+function cookieContext(req:Request):Record<string,string>{
+ const raw=req.headers.get('cookie')||''
+ const part=raw.split(';').map(v=>v.trim()).find(v=>v.startsWith('mtdlab-fraud-context='))
+ if(!part)return {}
+ try{return JSON.parse(decodeURIComponent(part.slice('mtdlab-fraud-context='.length)))||{}}catch{return {}}
+}
+
 export function buildFraudHeaders(req:Request,form:FormData,taxpayerId:string){
+  const saved=cookieContext(req)
   const forwarded=req.headers.get('x-forwarded-for')||req.headers.get('x-vercel-forwarded-for')||''
   const sandbox=process.env.HMRC_ENVIRONMENT!=='production'
   const clientIp=forwarded.split(',')[0]?.trim()||(sandbox?'127.0.0.1':'')
   const vendorPublicIp=process.env.HMRC_VENDOR_PUBLIC_IP||(sandbox?clientIp:'')
   const vendorLicenseHash=process.env.HMRC_VENDOR_LICENSE_ID_HASH||(sandbox?'sandbox':'')
-  const publicPort=String(form.get('clientPublicPort')||'').trim()||(sandbox?'443':'')
-  const multiFactor=String(form.get('multiFactor')||'').trim()||(sandbox?`type=OTHER&timestamp=${new Date().toISOString()}`:'')
-  const browserUserAgent=String(form.get('browserUserAgent')||'').trim()
-  const deviceId=String(form.get('deviceId')||'').trim()
-  const screens=String(form.get('screens')||'').trim()
-  const timezone=String(form.get('timezone')||'').trim()
-  const windowSize=String(form.get('windowSize')||'').trim()
+  const publicPort=String(form.get('clientPublicPort')||saved.clientPublicPort||'').trim()||(sandbox?'443':'')
+  const multiFactor=String(form.get('multiFactor')||saved.multiFactor||'').trim()||(sandbox?`type=OTHER&timestamp=${new Date().toISOString()}`:'')
+  const browserUserAgent=String(form.get('browserUserAgent')||saved.browserUserAgent||req.headers.get('user-agent')||'').trim()
+  const deviceId=String(form.get('deviceId')||saved.deviceId||'').trim()
+  const screens=String(form.get('screens')||saved.screens||'').trim()
+  const timezone=String(form.get('timezone')||saved.timezone||'').trim()
+  const windowSize=String(form.get('windowSize')||saved.windowSize||'').trim()
   const collectedAt=new Date().toISOString()
   const headers:Record<string,string>={
     'Gov-Client-Connection-Method':'WEB_APP_VIA_SERVER',
