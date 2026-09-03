@@ -17,11 +17,17 @@ export default async function ReviewPage({params,searchParams}:{params:Promise<{
  const {id}=await params;const qs=await searchParams;const token=String(qs.data||'');const p:any=verifyReviewPayload(token)
  if(!p||p.taxpayerId!==id)return <main className="main"><h1>Quarterly update</h1><p>Review data is missing, invalid or has been altered.</p><Link className="btn" href={`/taxpayers/${id}/submissions`}>Return to Submission Centre</Link></main>
  const db=supabaseAdmin();const workspace=await currentWorkspace();const firmId=workspace?.firmId||''
- const [{data:agentRows},{data:submissionRow}]=await Promise.all([
-  firmId?db.from('mtd_agent_authorisations').select('agent_id,expires_at,mtd_agents(agent_name,organisation_name,hmrc_arn,status)').eq('taxpayer_id',id).eq('firm_id',firmId).eq('status','authorised').eq('can_submit_quarterly',true):Promise.resolve({data:[]} as any),
+ const [{data:agentRowsRaw,error:agentRowsError},{data:submissionRow}]=await Promise.all([
+  firmId?db.from('mtd_agent_authorisations').select('agent_id,expires_at').eq('taxpayer_id',id).eq('firm_id',firmId).eq('status','authorised').eq('can_submit_quarterly',true):Promise.resolve({data:[],error:null} as any),
   qs.submissionId&&firmId?db.from('hmrc_quarterly_submissions').select('id,status,response_payload,error_message,hmrc_correlation_id').eq('id',qs.submissionId).eq('taxpayer_id',id).eq('firm_id',firmId).maybeSingle():Promise.resolve({data:null} as any)
  ])
- const activeAgents=(agentRows||[]).filter((r:any)=>(!r.expires_at||new Date(r.expires_at).getTime()>Date.now())&&(!r.mtd_agents?.status||r.mtd_agents.status==='active'))
+ if(agentRowsError)throw agentRowsError
+ const agentIdsForReview=Array.from(new Set((agentRowsRaw||[]).map((r:any)=>String(r.agent_id||'')).filter(Boolean)))
+ const {data:agentRecords,error:agentRecordsError}=agentIdsForReview.length&&firmId?await db.from('mtd_agents').select('id,agent_name,organisation_name,hmrc_arn,status').eq('firm_id',firmId).in('id',agentIdsForReview):{data:[] as any[],error:null}
+ if(agentRecordsError)throw agentRecordsError
+ const agentById=new Map((agentRecords||[]).map((agent:any)=>[String(agent.id),agent]))
+ const agentRows=(agentRowsRaw||[]).map((row:any)=>({...row,mtd_agents:agentById.get(String(row.agent_id))||null}))
+ const activeAgents=agentRows.filter((r:any)=>(!r.expires_at||new Date(r.expires_at).getTime()>Date.now())&&r.mtd_agents?.status==='active')
  const activeAgentIds=activeAgents.map((r:any)=>r.agent_id).filter(Boolean)
  const {data:connectionRows}=activeAgentIds.length&&firmId?await db.from('agent_hmrc_connections').select('agent_id,access_token,refresh_token').eq('firm_id',firmId).in('agent_id',activeAgentIds):{data:[] as any[]}
  const connectedIds=new Set((connectionRows||[]).filter((r:any)=>r.access_token||r.refresh_token).map((r:any)=>String(r.agent_id)))
