@@ -1,7 +1,9 @@
 import Link from 'next/link'
+import { notFound } from 'next/navigation'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import { incomeSourceType, incomeSourceTypeFromBusinessId, type MtdIncomeSourceType } from '@/lib/mtd-income-source'
+import { currentWorkspace } from '@/lib/workspace'
 
 export const dynamic='force-dynamic'
 
@@ -9,15 +11,9 @@ function decode(value?:string){try{return value?JSON.parse(Buffer.from(value,'ba
 function fmtDate(value?:string|null){if(!value)return '';return new Date(`${value}T00:00:00`).toLocaleDateString('en-GB',{day:'2-digit',month:'short',year:'numeric'})}
 const n=(v:any)=>Number(v||0)
 
-const selfFields=[
- ['turnover','Turnover'],['otherIncome','Other Income'],['taxTakenOff','Tax taken off trading income'],['costOfGoods','Cost of goods sold'],['cisPayments','CIS payments to subcontractors'],['staffCosts','Wages, salaries and other staff costs'],['travelCosts','Car, van and travel expenses'],['premisesCosts','Rent, rates, power and insurance costs'],['repairsMaintenance','Repairs and maintenance of property equipment'],['officeCosts','Phone, fax, stationery and other office costs'],['advertisingCosts','Advertising costs'],['businessEntertainment','Business entertainment costs'],['interestLoans','Interest on bank and other loans'],['financialCharges','Bank, credit card and other financial charges'],['badDebts','Irrecoverable debts written off'],['professionalFees','Accountancy, legal and other professional fees'],['depreciation','Depreciation and loss or profit on sale of assets'],['otherExpenses','Other business expenses']
-]
-const ukPropertyFields=[
- ['rents','Rental Income'],['leasePremiums','Premiums of Lease Grant'],['reversePremiums','Reverse Premiums'],['otherIncome','Other Property Income'],['ukTaxDeducted','UK Tax Deducted'],['rentARoomReceived','Rent a Room Received'],['premisesCosts','Premises Running Costs'],['repairsMaintenance','Repairs and Maintenance'],['financialCosts','Financial Costs'],['professionalFees','Professional Fees'],['travelCosts','Travel Costs'],['costOfServices','Cost of Services'],['otherExpenses','Other Costs'],['rentARoomRelief','Rent a Room Relief'],['residentialFinancialCost','Residential Financial Cost'],['carryForwardResidentialFinanceCost','Carry Forward Residential Finance Cost']
-]
-const foreignPropertyFields=[
- ['rents','Total Rents and Other Receipts'],['leasePremiums','Premiums of Lease Grant'],['otherIncome','Other Foreign Property Income'],['premisesCosts','Rent, Rates, Insurance and Ground Rents'],['repairsMaintenance','Property Repairs and Maintenance'],['financialCosts','Property Finance Costs'],['professionalFees','Legal, Management and Professional Fees'],['costOfServices','Costs of Services Provided'],['travelCosts','Travel Expenses'],['otherExpenses','Other Allowable Foreign Property Expenses']
-]
+const selfFields=[['turnover','Turnover'],['otherIncome','Other Income'],['taxTakenOff','Tax taken off trading income'],['costOfGoods','Cost of goods sold'],['cisPayments','CIS payments to subcontractors'],['staffCosts','Wages, salaries and other staff costs'],['travelCosts','Car, van and travel expenses'],['premisesCosts','Rent, rates, power and insurance costs'],['repairsMaintenance','Repairs and maintenance of property equipment'],['officeCosts','Phone, fax, stationery and other office costs'],['advertisingCosts','Advertising costs'],['businessEntertainment','Business entertainment costs'],['interestLoans','Interest on bank and other loans'],['financialCharges','Bank, credit card and other financial charges'],['badDebts','Irrecoverable debts written off'],['professionalFees','Accountancy, legal and other professional fees'],['depreciation','Depreciation and loss or profit on sale of assets'],['otherExpenses','Other business expenses']]
+const ukPropertyFields=[['rents','Rental Income'],['leasePremiums','Premiums of Lease Grant'],['reversePremiums','Reverse Premiums'],['otherIncome','Other Property Income'],['ukTaxDeducted','UK Tax Deducted'],['rentARoomReceived','Rent a Room Received'],['premisesCosts','Premises Running Costs'],['repairsMaintenance','Repairs and Maintenance'],['financialCosts','Financial Costs'],['professionalFees','Professional Fees'],['travelCosts','Travel Costs'],['costOfServices','Cost of Services'],['otherExpenses','Other Costs'],['rentARoomRelief','Rent a Room Relief'],['residentialFinancialCost','Residential Financial Cost'],['carryForwardResidentialFinanceCost','Carry Forward Residential Finance Cost']]
+const foreignPropertyFields=[['rents','Total Rents and Other Receipts'],['leasePremiums','Premiums of Lease Grant'],['otherIncome','Other Foreign Property Income'],['premisesCosts','Rent, Rates, Insurance and Ground Rents'],['repairsMaintenance','Property Repairs and Maintenance'],['financialCosts','Property Finance Costs'],['professionalFees','Legal, Management and Professional Fees'],['costOfServices','Costs of Services Provided'],['travelCosts','Travel Expenses'],['otherExpenses','Other Allowable Foreign Property Expenses']]
 
 const laneMeta:Record<MtdIncomeSourceType,{eyebrow:string;label:string;description:string;action:string}>={
  'self-employment':{eyebrow:'Self Assessment',label:'Self Employment',description:'Sole trader and self employment cumulative quarterly updates.',action:'Open self employment'},
@@ -26,12 +22,13 @@ const laneMeta:Record<MtdIncomeSourceType,{eyebrow:string;label:string;descripti
 }
 
 export default async function SubmissionCentre({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
- const {id}=await params;const qs=await searchParams;const db=supabaseAdmin()
+ const {id}=await params;const qs=await searchParams;const workspace=await currentWorkspace();if(!workspace)notFound();const db=supabaseAdmin()
  const [{data:taxpayer},{data:businesses},{data:obligations}]=await Promise.all([
-  db.from('taxpayers').select('*').eq('id',id).maybeSingle(),
-  db.from('hmrc_businesses').select('*').eq('taxpayer_id',id).order('created_at'),
-  db.from('hmrc_obligations').select('*').eq('taxpayer_id',id).gte('period_start','2025-04-06').order('period_end')
+  db.from('taxpayers').select('*').eq('id',id).eq('firm_id',workspace.firmId).maybeSingle(),
+  db.from('hmrc_businesses').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).order('created_at'),
+  db.from('hmrc_obligations').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).gte('period_start','2025-04-06').order('period_end')
  ])
+ if(!taxpayer)notFound()
  const sourceMap=new Map<string,any>()
  for(const business of businesses||[])if(business.business_id)sourceMap.set(business.business_id,{...business,sourceType:incomeSourceType(business),fallback:false})
  for(const obligation of obligations||[]){const businessId=String(obligation.business_id||'').trim();if(businessId&&!sourceMap.has(businessId))sourceMap.set(businessId,{business_id:businessId,business_name:null,sourceType:incomeSourceTypeFromBusinessId(businessId),fallback:true})}
@@ -53,7 +50,7 @@ export default async function SubmissionCentre({params,searchParams}:{params:Pro
  const meta=laneMeta[type]
  const importedQuery=qs.imported?`&imported=${encodeURIComponent(qs.imported)}`:''
  return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="submissions" sourceTypes={availableTypes}/><main className="main">
-  <div className="top"><div><h1 className="pageTitle">Submission Centre</h1><p className="muted">Prepare cumulative MTD figures in separate income source lanes or import an MTD Lab Excel template.</p></div><span className="badge">{taxpayer?.display_name||id}</span></div>
+  <div className="top"><div><h1 className="pageTitle">Submission Centre</h1><p className="muted">Prepare cumulative MTD figures in separate income source lanes or import an MTD Lab Excel template.</p></div><span className="badge">{taxpayer.display_name||id}</span></div>
   <div className="cards">{availableTypes.length?availableTypes.map(laneType=>{const lane=laneMeta[laneType];return <div className="card" key={laneType}><span className="eyebrow">{lane.eyebrow}</span><strong className="dateValue">{lane.label}</strong><p className="muted">{lane.description}</p><Link className="btn btnSmall" href={`/taxpayers/${id}/submissions?type=${laneType}`}>{lane.action}</Link></div>}):<div className="card"><span className="eyebrow">Income sources</span><strong>No HMRC source available</strong><p className="muted">Synchronise HMRC before preparing a quarterly update.</p></div>}</div>
   {qs.error&&<div className="status statusError">{qs.error}</div>}{qs.uploaded&&<div className="status"><strong>Template imported.</strong> Review the figures and choose the HMRC quarter below.</div>}
   <section className="panel"><div className="sectionHead"><div><h2>{meta.label} Submission</h2><p className="muted">Figures are submitted cumulatively from the beginning of the tax year to the selected period end. Future quarters can be prepared and reviewed before HMRC submission becomes eligible.</p></div><a className="btn btnSmall" href={`/api/templates/${type}`}>Download Excel template</a></div>
