@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { isSameOriginRequest } from '@/lib/request-security'
+import { currentWorkspace } from '@/lib/workspace'
 
 export const dynamic = 'force-dynamic'
 
@@ -14,6 +15,9 @@ function isHmrcSandbox() {
 export async function POST(req: Request) {
   if (!isSameOriginRequest(req)) return new NextResponse('Invalid request origin', { status: 403 })
 
+  const workspace = await currentWorkspace()
+  if (!workspace) return NextResponse.json({ error: 'Accounting workspace access is not available.' }, { status: 401 })
+
   if (!isHmrcSandbox()) {
     return NextResponse.json({ error: 'Sandbox reset is disabled outside the HMRC sandbox.' }, { status: 403 })
   }
@@ -26,25 +30,38 @@ export async function POST(req: Request) {
 
   const db = supabaseAdmin()
 
-  // Taxpayer-owned HMRC connections, businesses, obligations, sync history,
-  // authorisations and filing evidence use ON DELETE CASCADE from taxpayers.
-  // Agent OAuth connections and authorisations use ON DELETE CASCADE from agents.
-  // Delete taxpayers first, then agents, leaving app users/configuration untouched.
-  const { data: taxpayers, error: taxpayerReadError } = await db.from('taxpayers').select('id')
+  // Only remove records owned by the signed-in accounting firm's workspace.
+  // Cascading foreign keys remove that firm's taxpayer/agent child records while
+  // leaving every other firm's data untouched.
+  const { data: taxpayers, error: taxpayerReadError } = await db
+    .from('taxpayers')
+    .select('id')
+    .eq('firm_id', workspace.firmId)
   if (taxpayerReadError) return NextResponse.json({ error: taxpayerReadError.message }, { status: 500 })
 
   const taxpayerIds = (taxpayers || []).map((row: any) => row.id)
   if (taxpayerIds.length) {
-    const { error } = await db.from('taxpayers').delete().in('id', taxpayerIds)
+    const { error } = await db
+      .from('taxpayers')
+      .delete()
+      .eq('firm_id', workspace.firmId)
+      .in('id', taxpayerIds)
     if (error) return NextResponse.json({ error: `Taxpayer reset failed: ${error.message}` }, { status: 500 })
   }
 
-  const { data: agents, error: agentReadError } = await db.from('mtd_agents').select('id')
+  const { data: agents, error: agentReadError } = await db
+    .from('mtd_agents')
+    .select('id')
+    .eq('firm_id', workspace.firmId)
   if (agentReadError) return NextResponse.json({ error: agentReadError.message }, { status: 500 })
 
   const agentIds = (agents || []).map((row: any) => row.id)
   if (agentIds.length) {
-    const { error } = await db.from('mtd_agents').delete().in('id', agentIds)
+    const { error } = await db
+      .from('mtd_agents')
+      .delete()
+      .eq('firm_id', workspace.firmId)
+      .in('id', agentIds)
     if (error) return NextResponse.json({ error: `Agent reset failed: ${error.message}` }, { status: 500 })
   }
 
@@ -52,6 +69,6 @@ export async function POST(req: Request) {
     ok: true,
     removedTaxpayers: taxpayerIds.length,
     removedAgents: agentIds.length,
-    message: 'MTD Lab sandbox records reset. HMRC test identities themselves are not deleted by this action.',
+    message: `Sandbox records reset for ${workspace.firmName}. Other firms were not affected.`,
   })
 }
