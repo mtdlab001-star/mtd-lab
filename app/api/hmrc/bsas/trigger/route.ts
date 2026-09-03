@@ -4,11 +4,13 @@ import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
 import { isSameOriginRequest } from '@/lib/request-security'
+import { currentWorkspace } from '@/lib/workspace'
 
 function yearDates(taxYear:string){const start=Number(taxYear.slice(0,4));return {startDate:`${start}-04-06`,endDate:`${start+1}-04-05`}}
 
 export async function POST(req:Request){
  if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
+ const workspace=await currentWorkspace();if(!workspace)return new NextResponse('Accounting workspace access is not available',{status:403})
  const form=await req.formData()
  const taxpayerId=String(form.get('taxpayerId')||'demo')
  const taxYear=String(form.get('taxYear')||'')
@@ -20,8 +22,11 @@ export async function POST(req:Request){
   back.searchParams.set('error','Tax year, business and income source type are required')
   return NextResponse.redirect(back,303)
  }
- const {data:taxpayer}=await supabaseAdmin().from('taxpayers').select('nino').eq('id',taxpayerId).maybeSingle()
- if(!taxpayer?.nino){back.searchParams.set('error','Taxpayer NINO is missing');return NextResponse.redirect(back,303)}
+ const db=supabaseAdmin();const [{data:taxpayer},{data:business}]=await Promise.all([
+  db.from('taxpayers').select('nino').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle(),
+  db.from('hmrc_businesses').select('id').eq('taxpayer_id',taxpayerId).eq('firm_id',workspace.firmId).eq('business_id',businessId).maybeSingle()
+ ])
+ if(!taxpayer?.nino||!business){back.searchParams.set('error','Taxpayer or HMRC business is not available in this accounting workspace');return NextResponse.redirect(back,303)}
  let token:string
  try{token=await getValidHmrcAccessToken(taxpayerId)}catch(e:any){back.searchParams.set('error',e.message||'HMRC connection is incomplete');return NextResponse.redirect(back,303)}
  const fraud=buildFraudHeaders(req,form,taxpayerId)
