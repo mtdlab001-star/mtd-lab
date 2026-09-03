@@ -4,6 +4,8 @@ import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
 import { isSameOriginRequest } from '@/lib/request-security'
+import { taxYearHasEnded } from '@/lib/year-end-finalisation'
+import { currentWorkspace } from '@/lib/workspace'
 
 function num(form:FormData,key:string){const raw=String(form.get(key)||'').trim();if(!raw)return undefined;const n=Number(raw);return Number.isFinite(n)&&n>=0?n:undefined}
 function text(form:FormData,key:string){const v=String(form.get(key)||'').trim();return v||undefined}
@@ -13,12 +15,15 @@ function anyDefined(obj:any){return Object.values(obj).some(v=>v!==undefined&&v!
 
 export async function POST(req:Request){
  if(!isSameOriginRequest(req))return new NextResponse('Invalid request origin',{status:403})
+ const workspace=await currentWorkspace();if(!workspace)return new NextResponse('Accounting workspace access is not available',{status:403})
  const form=await req.formData();const taxpayerId=String(form.get('taxpayerId')||'demo');const taxYear=String(form.get('taxYear')||'')
  const back=new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/end-of-year/other-income`,req.url);back.searchParams.set('taxYear',taxYear)
  if(!/^20\d{2}-\d{2}$/.test(taxYear)){back.searchParams.set('error','Select a valid HMRC tax year');return NextResponse.redirect(back,303)}
+ if(!taxYearHasEnded(taxYear)){back.searchParams.set('error','Other Income can be prepared now, but HMRC submission is locked until the selected tax year has ended.');return NextResponse.redirect(back,303)}
+ if(process.env.HMRC_ENVIRONMENT==='production'&&process.env.HMRC_ALLOW_PRODUCTION_SUBMISSIONS!=='true'){back.searchParams.set('error','Production HMRC submissions are locked until explicitly enabled.');return NextResponse.redirect(back,303)}
  const is2026On=taxYearStart(taxYear)>=2026
  const v3Enabled=process.env.HMRC_OTHER_INCOME_V3_ENABLED==='true'
- if(is2026On&&!v3Enabled){back.searchParams.set('error','HMRC has not yet published Individuals Other Income API v3 for 2026-27 in the Developer Hub. Preparation is available, but HMRC submission is temporarily unavailable.');return NextResponse.redirect(back,303)}
+ if(is2026On&&!v3Enabled){back.searchParams.set('error','HMRC Other Income submission for 2026-27 is not enabled in MTD Lab yet. Preparation remains available.');return NextResponse.redirect(back,303)}
  const payload:any={}
  const postAmount=num(form,'postCessationAmount');const postTaxYear=text(form,'postCessationTaxYear')
  if(postAmount!==undefined||postTaxYear){if(postAmount===undefined||!postTaxYear){back.searchParams.set('error','Post cessation receipts require both amount and tax year to be taxed.');return NextResponse.redirect(back,303)}payload.postCessationReceipts=[clean({customerReference:text(form,'postCustomerReference'),businessName:text(form,'postBusinessName'),dateBusinessCeased:text(form,'dateBusinessCeased'),businessDescription:text(form,'businessDescription'),incomeSource:text(form,'postIncomeSource'),amount:postAmount,taxYearIncomeToBeTaxed:postTaxYear})]}
@@ -36,7 +41,7 @@ export async function POST(req:Request){
   if(category||anyDefined(breakdown)){if(!category||!allowed.has(category)){back.searchParams.set('error','Choose a valid additional income category.');return NextResponse.redirect(back,303)}if(!anyDefined(breakdown)){back.searchParams.set('error','Enter at least one amount for the selected additional income category.');return NextResponse.redirect(back,303)}payload.additionalIncome={[category]:breakdown}}
  }
  if(Object.keys(payload).length===0){back.searchParams.set('error','Enter at least one Other Income item before submitting.');return NextResponse.redirect(back,303)}
- const {data:taxpayer}=await supabaseAdmin().from('taxpayers').select('nino').eq('id',taxpayerId).maybeSingle();if(!taxpayer?.nino){back.searchParams.set('error','Taxpayer NINO is missing');return NextResponse.redirect(back,303)}
+ const {data:taxpayer}=await supabaseAdmin().from('taxpayers').select('nino').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle();if(!taxpayer?.nino){back.searchParams.set('error','Taxpayer is not available in this accounting workspace or has no NINO');return NextResponse.redirect(back,303)}
  let token:string;try{token=await getValidHmrcAccessToken(taxpayerId)}catch(e:any){back.searchParams.set('error',e.message||'HMRC connection is incomplete');return NextResponse.redirect(back,303)}
  const fraud=buildFraudHeaders(req,form,taxpayerId);if(fraud.missing.length){back.searchParams.set('error',`Missing HMRC fraud prevention data: ${fraud.missing.join(', ')}`);return NextResponse.redirect(back,303)}
  const apiVersion=is2026On?'3.0':'2.0'
