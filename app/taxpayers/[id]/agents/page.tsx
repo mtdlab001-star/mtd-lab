@@ -19,13 +19,19 @@ export default async function AgentAuthorisationPage({params,searchParams}:{para
   if(!workspace)unavailable='Your accounting workspace is not available or is not approved.'
   try{
     if(workspace){const db=supabaseAdmin();try{await expireAgentAuthorisations(id)}catch{}
-      const [{data:taxpayerRow},{data:links},{data:connections}]=await Promise.all([
+      const [{data:taxpayerRow,error:taxpayerError},{data:links,error:linksError},{data:connections,error:connectionsError}]=await Promise.all([
         db.from('taxpayers').select('id,display_name,nino').eq('id',id).eq('firm_id',workspace.firmId).maybeSingle(),
-        db.from('mtd_agent_authorisations').select('*,mtd_agents(*)').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).order('created_at',{ascending:false}),
+        db.from('mtd_agent_authorisations').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).order('created_at',{ascending:false}),
         db.from('agent_hmrc_connections').select('agent_id,connected_at,token_expires_at').eq('firm_id',workspace.firmId)
       ])
+      if(taxpayerError)throw taxpayerError
+      if(linksError)throw linksError
+      if(connectionsError)throw connectionsError
+      const agentIds=Array.from(new Set((links||[]).map((link:any)=>String(link.agent_id||'')).filter(Boolean)))
+      let agentsById=new Map<string,any>()
+      if(agentIds.length){const {data:agents,error:agentsError}=await db.from('mtd_agents').select('*').eq('firm_id',workspace.firmId).in('id',agentIds);if(agentsError)throw agentsError;agentsById=new Map((agents||[]).map((agent:any)=>[String(agent.id),agent]))}
       taxpayer=taxpayerRow
-      rows=links||[]
+      rows=(links||[]).map((link:any)=>({...link,mtd_agents:agentsById.get(String(link.agent_id))||null}))
       agentConnections=connections||[]
     }
   }catch(error:any){
