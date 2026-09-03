@@ -22,7 +22,7 @@ async function assertAgentAccess(agentId:string){
   return workspace
 }
 
-async function refreshStoredToken(table:string,column:string,id:string,conn:any){
+async function refreshStoredToken(table:string,column:string,id:string,firmId:string,conn:any){
   if(!conn.refresh_token) throw new Error('HMRC session expired. Reconnect to HMRC.')
   const db=supabaseAdmin()
   const token=await refreshAccessToken(conn.refresh_token)
@@ -33,7 +33,7 @@ async function refreshStoredToken(table:string,column:string,id:string,conn:any)
     token_expires_at:nextExpiresAt,
     scope:token.scope||conn.scope||null,
     updated_at:new Date().toISOString()
-  }).eq(column,id)
+  }).eq('firm_id',firmId).eq(column,id)
   if(updateError) throw new Error(`Could not save refreshed HMRC token: ${updateError.message}`)
   return token.access_token
 }
@@ -49,24 +49,21 @@ export async function getValidHmrcAccessToken(taxpayerId:string){
   if(!needsRefresh) return conn.access_token as string
   if(!conn.refresh_token) throw new Error('HMRC session expired. Reconnect this taxpayer to HMRC.')
 
-  return refreshStoredToken('hmrc_connections','taxpayer_id',taxpayerId,conn)
+  return refreshStoredToken('hmrc_connections','taxpayer_id',taxpayerId,workspace.firmId,conn)
 }
 
 export async function getValidAgentHmrcAccessToken(agentId:string){
   const workspace=await assertAgentAccess(agentId)
   const db=supabaseAdmin()
-  const {data:conn,error}=await db.from('agent_hmrc_connections').select('*').eq('agent_id',agentId).maybeSingle()
+  const {data:conn,error}=await db.from('agent_hmrc_connections').select('*').eq('firm_id',workspace.firmId).eq('agent_id',agentId).maybeSingle()
   if(error||!conn?.access_token) throw new Error('Connect this agent ASA to HMRC before filing for authorised clients.')
-
-  const {data:agent}=await db.from('mtd_agents').select('id').eq('id',agentId).eq('firm_id',workspace.firmId).maybeSingle()
-  if(!agent)throw new Error('This agent is not available in your accounting workspace')
 
   const expiresAt=conn.token_expires_at?new Date(conn.token_expires_at).getTime():0
   const needsRefresh=Boolean(expiresAt && expiresAt <= Date.now()+60_000)
   if(!needsRefresh) return conn.access_token as string
   if(!conn.refresh_token) throw new Error('HMRC agent ASA session expired. Reconnect this agent ASA to HMRC.')
 
-  return refreshStoredToken('agent_hmrc_connections','agent_id',agentId,conn)
+  return refreshStoredToken('agent_hmrc_connections','agent_id',agentId,workspace.firmId,conn)
 }
 
 export async function getHmrcAccessTokenForActingCapacity(taxpayerId:string,agentId?:string|null){
