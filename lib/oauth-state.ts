@@ -2,10 +2,10 @@ import crypto from 'node:crypto'
 
 const ttlMs = 10 * 60 * 1000
 
-export function signState(taxpayerId: string, agentId?: string | null) {
+export function signState(taxpayerId: string, agentId?: string | null, firmId?: string | null) {
   const secret = process.env.HMRC_STATE_SECRET
   if (!secret) throw new Error('HMRC_STATE_SECRET is missing')
-  const payload = Buffer.from(JSON.stringify({ taxpayerId, agentId: agentId || null, ts: Date.now(), nonce: crypto.randomUUID() })).toString('base64url')
+  const payload = Buffer.from(JSON.stringify({ taxpayerId, agentId: agentId || null, firmId: firmId || null, ts: Date.now(), nonce: crypto.randomUUID() })).toString('base64url')
   const sig = crypto.createHmac('sha256', secret).update(payload).digest('base64url')
   return `${payload}.${sig}`
 }
@@ -22,7 +22,7 @@ export function verifyState(value: string) {
   const actualBuffer = Buffer.from(sig)
   const expectedBuffer = Buffer.from(expected)
   if (actualBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(actualBuffer, expectedBuffer)) throw new Error('Invalid OAuth state')
-  let parsed: { taxpayerId?: string; agentId?: string | null; ts?: number }
+  let parsed: { taxpayerId?: string; agentId?: string | null; firmId?: string | null; ts?: number }
   try {
     parsed = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'))
   } catch {
@@ -30,7 +30,8 @@ export function verifyState(value: string) {
   }
   if (!parsed.taxpayerId || typeof parsed.ts !== 'number' || !Number.isFinite(parsed.ts)) throw new Error('Invalid OAuth state')
   if (parsed.agentId !== undefined && parsed.agentId !== null && typeof parsed.agentId !== 'string') throw new Error('Invalid OAuth state')
+  if (parsed.firmId !== undefined && parsed.firmId !== null && typeof parsed.firmId !== 'string') throw new Error('Invalid OAuth state')
   const age = Date.now() - parsed.ts
   if (age < -60_000 || age > ttlMs) throw new Error('Expired OAuth state')
-  return { taxpayerId: parsed.taxpayerId, agentId: parsed.agentId || null, ts: parsed.ts }
+  return { taxpayerId: parsed.taxpayerId, agentId: parsed.agentId || null, firmId: parsed.firmId || null, ts: parsed.ts }
 }
