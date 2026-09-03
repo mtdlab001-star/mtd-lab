@@ -1,7 +1,9 @@
+import { redirect } from 'next/navigation'
 import TaxpayerSidebar from '@/app/components/TaxpayerSidebar'
 import FraudContextFields from '@/app/components/FraudContextFields'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { taxYearFromDate, yearEndFinalisationStatus } from '@/lib/year-end-finalisation'
+import { currentWorkspace } from '@/lib/workspace'
 
 export const dynamic='force-dynamic'
 
@@ -15,21 +17,23 @@ function sandboxSignal(obj:any){const text=JSON.stringify(obj||{});return /5000\
 export default async function CalculationsPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
   const {id}=await params
   const qs=await searchParams
+  const workspace=await currentWorkspace();if(!workspace)redirect('/login')
   const db=supabaseAdmin()
   const [{data:taxpayer},{count:businessCount},{data:obligations},{data:submissions},{data:agentRows}]=await Promise.all([
-    db.from('taxpayers').select('display_name,nino').eq('id',id).maybeSingle(),
-    db.from('hmrc_businesses').select('id',{count:'exact',head:true}).eq('taxpayer_id',id),
-    db.from('hmrc_obligations').select('period_start,period_end,status').eq('taxpayer_id',id).gte('period_start','2025-04-06'),
-    db.from('hmrc_quarterly_submissions').select('tax_year,status').eq('taxpayer_id',id).eq('status','submitted'),
-    db.from('mtd_agent_authorisations').select('agent_id,expires_at,mtd_agents(agent_name,organisation_name,hmrc_arn,status)').eq('taxpayer_id',id).eq('status','authorised').eq('can_submit_final_declaration',true)
+    db.from('taxpayers').select('display_name,nino').eq('id',id).eq('firm_id',workspace.firmId).maybeSingle(),
+    db.from('hmrc_businesses').select('id',{count:'exact',head:true}).eq('taxpayer_id',id).eq('firm_id',workspace.firmId),
+    db.from('hmrc_obligations').select('period_start,period_end,status').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).gte('period_start','2025-04-06'),
+    db.from('hmrc_quarterly_submissions').select('tax_year,status').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).eq('status','submitted'),
+    db.from('mtd_agent_authorisations').select('agent_id,expires_at,mtd_agents(agent_name,organisation_name,hmrc_arn,status)').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).eq('status','authorised').eq('can_submit_final_declaration',true)
   ])
+  if(!taxpayer)redirect('/taxpayers')
   const finalAgents=(agentRows||[]).filter((r:any)=>(!r.expires_at||new Date(r.expires_at).getTime()>Date.now())&&(!r.mtd_agents?.status||r.mtd_agents.status==='active'))
   const selectedActingAgentId=finalAgents.some((r:any)=>r.agent_id===qs.actingAgentId)?String(qs.actingAgentId):''
   const years=Array.from(new Set([...(obligations||[]).map((o:any)=>taxYearFromDate(o.period_start)),...(submissions||[]).map((s:any)=>s.tax_year).filter(Boolean)])).sort().reverse()
   const selected=qs.taxYear&&years.includes(qs.taxYear)?qs.taxYear:(years[0]||'2026-27')
   const [{data:storedRows},{data:reviews}]=await Promise.all([
-    db.from('mtd_submission_audit').select('calculation_id,response_summary,response_payload,hmrc_correlation_id,created_at').eq('taxpayer_id',id).eq('tax_year',selected).eq('event_type','tax_calculation_retrieval').eq('status','accepted').order('created_at',{ascending:false}).limit(1),
-    db.from('mtd_year_end_reviews').select('section,status').eq('taxpayer_id',id).eq('tax_year',selected),
+    db.from('mtd_submission_audit').select('calculation_id,response_summary,response_payload,hmrc_correlation_id,created_at').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).eq('tax_year',selected).eq('event_type','tax_calculation_retrieval').eq('status','accepted').order('created_at',{ascending:false}).limit(1),
+    db.from('mtd_year_end_reviews').select('section,status').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).eq('tax_year',selected),
   ])
   const stored:any=storedRows?.[0]||null
   const result:any=stored?.response_summary||stored?.response_payload||null
@@ -42,15 +46,13 @@ export default async function CalculationsPage({params,searchParams}:{params:Pro
   const allowances=findNumber(result,['totalAllowancesAndDeductions','allowancesAllocated','personalAllowance'])
   const messages=result?collectMessages(result).slice(0,8):[]
   const readiness=yearEndFinalisationStatus({taxYear:selected,businessCount:businessCount||0,obligations:obligations||[],reviews:reviews||[]})
-  const retrieveQuery=new URLSearchParams({taxpayerId:id,taxYear:selected,calculationId})
-  if(selectedActingAgentId)retrieveQuery.set('actingAgentId',selectedActingAgentId)
   const hasSandboxValues=sandboxSignal(result)
 
   return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="calculations"/><main className="main">
     <div className="top"><div><h1 className="pageTitle">HMRC Tax Calculation</h1><p className="muted">Check HMRC's calculation before submitting the MTD for Income Tax return.</p></div><span className="badge">Individual Calculations API v8.0</span></div>
     {qs.error&&<div className="status statusError"><strong>HMRC calculation needs attention.</strong><div>{qs.error}</div>{qs.correlationId&&<div className="muted">HMRC correlation ID: {qs.correlationId}</div>}</div>}
     <section className="panel"><h2>Tax calculation</h2><p className="muted">MTD Lab displays HMRC's calculation and preserves the latest accepted HMRC result for the selected tax year.</p><form method="post" action="/api/hmrc/calculations/trigger"><input type="hidden" name="taxpayerId" value={id}/><input type="hidden" name="calculationType" value="in-year"/><label>Tax year</label><select className="selectField" name="taxYear" defaultValue={selected}>{years.length?years.map(y=><option key={y} value={y}>{y}</option>):<option value="2026-27">2026-27</option>}</select>{finalAgents.length>0&&<><label htmlFor="triggerActingAgentId">Acting as</label><select id="triggerActingAgentId" name="actingAgentId" className="selectField" defaultValue={selectedActingAgentId}><option value="">Taxpayer or direct operator</option>{finalAgents.map((r:any)=><option key={r.agent_id} value={r.agent_id}>{agentLabel(r)}</option>)}</select></>}<FraudContextFields/><button className="btn" type="submit">Trigger HMRC tax calculation</button></form></section>
-    <section className="panel" style={{marginTop:16}}><div className="sectionHead"><div><h2>HMRC calculation result</h2><p className="muted">Retrieve and check the completed calculation before declaration.</p></div>{calculationId&&<a className="btn btnSmall" href={`/api/hmrc/calculations/retrieve?${retrieveQuery.toString()}`}>Retrieve calculation</a>}</div>{calculationId?<div className="mono">Calculation ID: {calculationId}</div>:<p className="empty">Trigger a calculation to create an HMRC calculation ID.</p>}{result&&<>
+    <section className="panel" style={{marginTop:16}}><div className="sectionHead"><div><h2>HMRC calculation result</h2><p className="muted">Retrieve and check the completed calculation before declaration.</p></div>{calculationId&&<form method="post" action="/api/hmrc/calculations/retrieve"><input type="hidden" name="taxpayerId" value={id}/><input type="hidden" name="taxYear" value={selected}/><input type="hidden" name="calculationId" value={calculationId}/>{selectedActingAgentId&&<input type="hidden" name="actingAgentId" value={selectedActingAgentId}/>}<FraudContextFields/><button className="btn btnSmall" type="submit">Retrieve calculation</button></form>}</div>{calculationId?<div className="mono">Calculation ID: {calculationId}</div>:<p className="empty">Trigger a calculation to create an HMRC calculation ID.</p>}{result&&<>
       {hasSandboxValues&&<div className="status" style={{marginTop:14}}><strong>HMRC sandbox response</strong><div>This calculation contains HMRC test fixture values. Figures labelled “Sandbox test value” must not be treated as a real tax liability.</div></div>}
       <div className="cards" style={{marginTop:14}}><div className="card"><span className="eyebrow">Taxable income</span><strong>{gbp(totalTaxableIncome)}</strong></div><div className="card"><span className="eyebrow">Income tax and NICs</span><strong>{gbp(totalIncomeTax)}</strong></div><div className="card"><span className="eyebrow">Total tax due</span><strong>{gbp(totalTaxDue)}</strong></div><div className="card"><span className="eyebrow">Calculation type</span><strong>{result?.metadata?.calculationType||'HMRC calculation'}</strong></div></div>
       <div className="grid3" style={{marginTop:14}}><section className="panel"><div className="muted">Allowances and deductions</div><div className="metric">{gbp(allowances)}</div></section><section className="panel"><div className="muted">Tax already deducted</div><div className="metric">{gbp(totalTaxDeducted)}</div></section><section className="panel"><div className="muted">Calculation status</div><div className="metric">Retrieved</div></section></div>
