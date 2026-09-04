@@ -93,8 +93,8 @@ export default function AutoCollapseLongSections() {
   const pathname = usePathname()
 
   useEffect(() => {
-    const timer = window.setTimeout(() => scan(true), 80)
-    const observer = new MutationObserver(() => window.requestAnimationFrame(() => scan(true)))
+    const timer = window.setTimeout(() => scan(true, true), 80)
+    const observer = new MutationObserver(() => window.requestAnimationFrame(() => scan(true, true)))
     observer.observe(document.body, { childList: true, subtree: true })
     return () => {
       window.clearTimeout(timer)
