@@ -19,14 +19,15 @@ function collapsePanel(panel: HTMLElement) {
   }
 }
 
-function collapseUntouchedPanel(panel: HTMLElement) {
+function collapseUntouchedPanel(panel: HTMLElement, resetUserToggle = false) {
+  if (resetUserToggle) delete panel.dataset.autoCollapseUserToggled
   if (panel.dataset.autoCollapseUserToggled === '1') return
   collapsePanel(panel)
 }
 
-function enhancePanel(panel: HTMLElement, forceCollapse = false) {
+function enhancePanel(panel: HTMLElement, forceCollapse = false, resetUserToggle = false) {
   if (panel.dataset.autoCollapseReady === '1') {
-    if (forceCollapse) collapseUntouchedPanel(panel)
+    if (forceCollapse) collapseUntouchedPanel(panel, resetUserToggle)
     return
   }
   if (panel.dataset.noAutoCollapse === '1') return
@@ -81,11 +82,11 @@ function enhancePanel(panel: HTMLElement, forceCollapse = false) {
 
   panel.insertBefore(button, panel.firstChild)
   panel.appendChild(fade)
-  collapseUntouchedPanel(panel)
+  collapseUntouchedPanel(panel, resetUserToggle)
 }
 
-function scan(forceCollapse = false) {
-  document.querySelectorAll<HTMLElement>('.panel').forEach(panel => enhancePanel(panel, forceCollapse))
+function scan(forceCollapse = false, resetUserToggle = false) {
+  document.querySelectorAll<HTMLElement>('.panel').forEach(panel => enhancePanel(panel, forceCollapse, resetUserToggle))
 }
 
 export default function AutoCollapseLongSections() {
@@ -102,7 +103,7 @@ export default function AutoCollapseLongSections() {
   }, [])
 
   useEffect(() => {
-    const timers = [80, 300, 800].map(delay => window.setTimeout(() => scan(true), delay))
+    const timers = [80, 300, 800].map(delay => window.setTimeout(() => scan(true, true), delay))
     return () => timers.forEach(timer => window.clearTimeout(timer))
   }, [pathname])
 
