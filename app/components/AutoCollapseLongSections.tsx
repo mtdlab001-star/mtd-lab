@@ -1,25 +1,39 @@
 'use client'
 
 import { useEffect } from 'react'
+import { usePathname } from 'next/navigation'
 
 const COLLAPSED_HEIGHT = 360
 const MIN_LONG_HEIGHT = 520
 
-function enhancePanel(panel: HTMLElement) {
-  if (panel.dataset.autoCollapseReady === '1') return
+function collapsePanel(panel: HTMLElement) {
+  const button = panel.querySelector<HTMLButtonElement>('button[data-auto-collapse-toggle="1"]')
+  const fade = panel.querySelector<HTMLElement>('[data-auto-collapse-fade="1"]')
+  panel.dataset.autoCollapsed = '1'
+  panel.style.maxHeight = `${COLLAPSED_HEIGHT}px`
+  panel.style.overflow = 'hidden'
+  if (fade) fade.style.display = 'block'
+  if (button) {
+    button.textContent = 'View more ▾'
+    button.setAttribute('aria-expanded', 'false')
+  }
+}
+
+function enhancePanel(panel: HTMLElement, forceCollapse = false) {
+  if (panel.dataset.autoCollapseReady === '1') {
+    if (forceCollapse) collapsePanel(panel)
+    return
+  }
   if (panel.dataset.noAutoCollapse === '1') return
   if (panel.scrollHeight < MIN_LONG_HEIGHT) return
 
   panel.dataset.autoCollapseReady = '1'
-  panel.dataset.autoCollapsed = '1'
   panel.style.position = panel.style.position || 'relative'
-  panel.style.maxHeight = `${COLLAPSED_HEIGHT}px`
-  panel.style.overflow = 'hidden'
   panel.style.transition = 'max-height .22s ease'
 
   const button = document.createElement('button')
   button.type = 'button'
-  button.textContent = 'Show more ▾'
+  button.textContent = 'View more ▾'
   button.setAttribute('aria-expanded', 'false')
   button.style.display = 'block'
   button.style.margin = '0 0 12px auto'
@@ -51,36 +65,40 @@ function enhancePanel(panel: HTMLElement) {
       panel.style.maxHeight = 'none'
       panel.style.overflow = 'visible'
       fade.style.display = 'none'
-      button.textContent = 'Show less ▴'
+      button.textContent = 'View less ▴'
       button.setAttribute('aria-expanded', 'true')
     } else {
-      panel.dataset.autoCollapsed = '1'
-      panel.style.maxHeight = `${COLLAPSED_HEIGHT}px`
-      panel.style.overflow = 'hidden'
-      fade.style.display = 'block'
-      button.textContent = 'Show more ▾'
-      button.setAttribute('aria-expanded', 'false')
+      collapsePanel(panel)
       panel.scrollIntoView({ behavior: 'smooth', block: 'start' })
     }
   })
 
   panel.insertBefore(button, panel.firstChild)
   panel.appendChild(fade)
+  collapsePanel(panel)
 }
 
-function scan() {
-  document.querySelectorAll<HTMLElement>('.panel').forEach(enhancePanel)
+function scan(forceCollapse = false) {
+  document.querySelectorAll<HTMLElement>('.panel').forEach(panel => enhancePanel(panel, forceCollapse))
 }
 
 export default function AutoCollapseLongSections() {
+  const pathname = usePathname()
+
   useEffect(() => {
-    const timer = window.setTimeout(scan, 80)
-    const observer = new MutationObserver(() => window.requestAnimationFrame(scan))
+    const timer = window.setTimeout(() => scan(), 80)
+    const observer = new MutationObserver(() => window.requestAnimationFrame(() => scan()))
     observer.observe(document.body, { childList: true, subtree: true })
     return () => {
       window.clearTimeout(timer)
       observer.disconnect()
     }
   }, [])
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => scan(true), 80)
+    return () => window.clearTimeout(timer)
+  }, [pathname])
+
   return null
 }
