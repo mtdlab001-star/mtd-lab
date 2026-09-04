@@ -19,9 +19,14 @@ function collapsePanel(panel: HTMLElement) {
   }
 }
 
+function collapseUntouchedPanel(panel: HTMLElement) {
+  if (panel.dataset.autoCollapseUserToggled === '1') return
+  collapsePanel(panel)
+}
+
 function enhancePanel(panel: HTMLElement, forceCollapse = false) {
   if (panel.dataset.autoCollapseReady === '1') {
-    if (forceCollapse) collapsePanel(panel)
+    if (forceCollapse) collapseUntouchedPanel(panel)
     return
   }
   if (panel.dataset.noAutoCollapse === '1') return
@@ -60,6 +65,7 @@ function enhancePanel(panel: HTMLElement, forceCollapse = false) {
 
   button.addEventListener('click', () => {
     const collapsed = panel.dataset.autoCollapsed === '1'
+    panel.dataset.autoCollapseUserToggled = '1'
     if (collapsed) {
       panel.dataset.autoCollapsed = '0'
       panel.style.maxHeight = 'none'
@@ -75,7 +81,7 @@ function enhancePanel(panel: HTMLElement, forceCollapse = false) {
 
   panel.insertBefore(button, panel.firstChild)
   panel.appendChild(fade)
-  collapsePanel(panel)
+  collapseUntouchedPanel(panel)
 }
 
 function scan(forceCollapse = false) {
@@ -86,8 +92,8 @@ export default function AutoCollapseLongSections() {
   const pathname = usePathname()
 
   useEffect(() => {
-    const timer = window.setTimeout(() => scan(), 80)
-    const observer = new MutationObserver(() => window.requestAnimationFrame(() => scan()))
+    const timer = window.setTimeout(() => scan(true), 80)
+    const observer = new MutationObserver(() => window.requestAnimationFrame(() => scan(true)))
     observer.observe(document.body, { childList: true, subtree: true })
     return () => {
       window.clearTimeout(timer)
@@ -96,8 +102,8 @@ export default function AutoCollapseLongSections() {
   }, [])
 
   useEffect(() => {
-    const timer = window.setTimeout(() => scan(true), 80)
-    return () => window.clearTimeout(timer)
+    const timers = [80, 300, 800].map(delay => window.setTimeout(() => scan(true), delay))
+    return () => timers.forEach(timer => window.clearTimeout(timer))
   }, [pathname])
 
   return null
