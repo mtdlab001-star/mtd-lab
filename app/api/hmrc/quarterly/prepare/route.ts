@@ -59,6 +59,24 @@ export async function POST(req: Request) {
     preparedAt:new Date().toISOString()
   }
   for(const key of moneyFields) payload[key]=money(form.get(key))
+
+  const now=new Date().toISOString()
+  const {error:draftError}=await db.from('hmrc_quarterly_drafts').upsert({
+    firm_id:workspace.firmId,
+    taxpayer_id:taxpayerId,
+    business_id:businessId,
+    income_source_type:eligibility.sourceType,
+    period_start:periodStart,
+    period_end:periodEnd,
+    figures:payload,
+    updated_at:now
+  },{onConflict:'firm_id,taxpayer_id,business_id,income_source_type,period_end'})
+  if(draftError){
+    console.error('Unable to save quarterly draft',draftError)
+    back.searchParams.set('error','Quarterly draft could not be saved')
+    return NextResponse.redirect(back,303)
+  }
+
   const token=signReviewPayload(payload)
   return NextResponse.redirect(new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/quarterly/review?data=${encodeURIComponent(token)}`,req.url),303)
 }
