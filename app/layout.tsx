@@ -3,6 +3,7 @@ import './operator-hide.css'
 import ClearWarningsOnRefresh from '@/app/components/ClearWarningsOnRefresh'
 import AutoCollapseLongSections from '@/app/components/AutoCollapseLongSections'
 import QuarterlyPreparationMode from '@/app/components/QuarterlyPreparationMode'
+import QuarterlyDraftHydrator from '@/app/components/QuarterlyDraftHydrator'
 import AIHelpWidget from '@/app/components/AIHelpWidget'
 
 export const metadata = {
@@ -16,5 +17,5 @@ export const metadata = {
 }
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return <html lang="en"><body><ClearWarningsOnRefresh /><AutoCollapseLongSections /><QuarterlyPreparationMode />{children}<AIHelpWidget /></body></html>
+  return <html lang="en"><body><ClearWarningsOnRefresh /><AutoCollapseLongSections /><QuarterlyPreparationMode /><QuarterlyDraftHydrator />{children}<AIHelpWidget /></body></html>
 }
