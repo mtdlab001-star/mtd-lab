@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { signReviewPayload } from '@/lib/review-token'
 import { isSameOriginRequest } from '@/lib/request-security'
+import { supabaseAdmin } from '@/lib/supabase-admin'
 
 function money(value: FormDataEntryValue | null) {
   const n=Number(value||0)
@@ -31,6 +32,22 @@ export async function POST(req: Request) {
     preparedAt:new Date().toISOString()
   }
   for(const key of moneyFields) payload[key]=money(form.get(key))
+
+  const db=supabaseAdmin()
+  const {error:draftError}=await db.from('hmrc_quarterly_drafts').upsert({
+    taxpayer_id:taxpayerId,
+    business_id:payload.businessId,
+    income_source_type:incomeSourceType,
+    period_start:payload.periodStart,
+    period_end:payload.periodEnd,
+    figures:payload,
+    updated_at:new Date().toISOString()
+  },{onConflict:'taxpayer_id,business_id,income_source_type,period_end'})
+  if(draftError){
+    console.error('Unable to save quarterly draft',draftError)
+    return new NextResponse('Unable to save quarterly draft',{status:500})
+  }
+
   const token=signReviewPayload(payload)
   return NextResponse.redirect(new URL(`/taxpayers/${encodeURIComponent(taxpayerId)}/quarterly/review?data=${encodeURIComponent(token)}`,req.url),303)
 }
