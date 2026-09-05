@@ -34,7 +34,11 @@ export async function POST(req: Request) {
   for(const key of moneyFields) payload[key]=money(form.get(key))
 
   const db=supabaseAdmin()
+  const {data:taxpayer,error:taxpayerError}=await db.from('taxpayers').select('firm_id').eq('id',taxpayerId).maybeSingle()
+  if(taxpayerError||!taxpayer?.firm_id)return new NextResponse('Unable to resolve accounting workspace for quarterly draft',{status:403})
+
   const {error:draftError}=await db.from('hmrc_quarterly_drafts').upsert({
+    firm_id:taxpayer.firm_id,
     taxpayer_id:taxpayerId,
     business_id:payload.businessId,
     income_source_type:incomeSourceType,
@@ -42,7 +46,7 @@ export async function POST(req: Request) {
     period_end:payload.periodEnd,
     figures:payload,
     updated_at:new Date().toISOString()
-  },{onConflict:'taxpayer_id,business_id,income_source_type,period_end'})
+  },{onConflict:'firm_id,taxpayer_id,business_id,income_source_type,period_end'})
   if(draftError){
     console.error('Unable to save quarterly draft',draftError)
     return new NextResponse('Unable to save quarterly draft',{status:500})
