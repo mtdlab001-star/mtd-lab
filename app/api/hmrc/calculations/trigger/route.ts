@@ -16,7 +16,7 @@ export async function POST(req:Request){
  const workspace=await currentWorkspace();if(!workspace)return new NextResponse('Accounting workspace access is not available',{status:403})
  const form=await req.formData();const taxpayerId=String(form.get('taxpayerId')||'demo');const taxYear=String(form.get('taxYear')||'');const calculationType=String(form.get('calculationType')||'in-year');const actingAgentId=String(form.get('actingAgentId')||'').trim()||null
  const backPath=calculationType==='intent-to-finalise'?`/taxpayers/${encodeURIComponent(taxpayerId)}/end-of-year`:`/taxpayers/${encodeURIComponent(taxpayerId)}/calculations`
- const back=new URL(backPath,req.url);back.searchParams.set('taxYear',taxYear)
+ const back=new URL(backPath,req.url);back.searchParams.set('taxYear',taxYear);if(actingAgentId)back.searchParams.set('actingAgentId',actingAgentId)
  if(!/^20\d{2}-\d{2}$/.test(taxYear)){back.searchParams.set('error','Select a valid HMRC tax year');return NextResponse.redirect(back,303)}
  if(!['in-year','intent-to-finalise','intent-to-amend'].includes(calculationType)){back.searchParams.set('error','Invalid HMRC calculation type');return NextResponse.redirect(back,303)}
  const db=supabaseAdmin();const {data:taxpayer}=await db.from('taxpayers').select('nino').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle();if(!taxpayer?.nino){back.searchParams.set('error','Taxpayer is not available in this accounting workspace or has no NINO');return NextResponse.redirect(back,303)}
