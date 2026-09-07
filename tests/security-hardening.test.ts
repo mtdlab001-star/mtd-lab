@@ -175,6 +175,16 @@ test('agent ASA OAuth state and callback are stored separately from taxpayer OAu
   assert.match(agentsPage,/agentId=\$\{encodeURIComponent\(r\.agent_id\)\}/)
 })
 
+test('taxpayer authorisation can safely reuse an existing firm agent',()=>{
+  const page=readFileSync('app/taxpayers/[id]/agents/page.tsx','utf8')
+  const route=readFileSync('app/api/agents/authorise/route.ts','utf8')
+
+  assert.match(page,/name="existingAgentId"/)
+  assert.match(page,/Choose an existing agent/)
+  assert.match(route,/\.eq\('id',existingAgentId\)\.eq\('firm_id',workspace\.firmId\)\.eq\('status','active'\)/)
+  assert.match(route,/else if\(!existingAgentId\)/)
+})
+
 test('delegated agent relationship controls are firm scoped and audited',()=>{
   const route=readFileSync('app/api/agents/hmrc-relationship/route.ts','utf8')
   const revoke=readFileSync('app/api/agents/revoke/route.ts','utf8')
