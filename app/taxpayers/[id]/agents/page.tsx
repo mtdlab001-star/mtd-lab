@@ -14,25 +14,29 @@ export default async function AgentAuthorisationPage({params,searchParams}:{para
   let taxpayer:any=null
   let rows:any[]=[]
   let agentConnections:any[]=[]
+  let existingAgents:any[]=[]
   let unavailable=''
   const workspace=await currentWorkspace()
   if(!workspace)unavailable='Your accounting workspace is not available or is not approved.'
   try{
     if(workspace){const db=supabaseAdmin();try{await expireAgentAuthorisations(id)}catch{}
-      const [{data:taxpayerRow,error:taxpayerError},{data:links,error:linksError},{data:connections,error:connectionsError}]=await Promise.all([
+      const [{data:taxpayerRow,error:taxpayerError},{data:links,error:linksError},{data:connections,error:connectionsError},{data:firmAgents,error:firmAgentsError}]=await Promise.all([
         db.from('taxpayers').select('id,display_name,nino').eq('id',id).eq('firm_id',workspace.firmId).maybeSingle(),
         db.from('mtd_agent_authorisations').select('*').eq('firm_id',workspace.firmId).eq('taxpayer_id',id).order('created_at',{ascending:false}),
-        db.from('agent_hmrc_connections').select('agent_id,connected_at,token_expires_at').eq('firm_id',workspace.firmId)
+        db.from('agent_hmrc_connections').select('agent_id,connected_at,token_expires_at').eq('firm_id',workspace.firmId),
+        db.from('mtd_agents').select('id,agent_name,organisation_name,hmrc_arn,email,status').eq('firm_id',workspace.firmId).eq('status','active').order('agent_name')
       ])
       if(taxpayerError)throw taxpayerError
       if(linksError)throw linksError
       if(connectionsError)throw connectionsError
+      if(firmAgentsError)throw firmAgentsError
       const agentIds=Array.from(new Set((links||[]).map((link:any)=>String(link.agent_id||'')).filter(Boolean)))
       let agentsById=new Map<string,any>()
       if(agentIds.length){const {data:agents,error:agentsError}=await db.from('mtd_agents').select('*').eq('firm_id',workspace.firmId).in('id',agentIds);if(agentsError)throw agentsError;agentsById=new Map((agents||[]).map((agent:any)=>[String(agent.id),agent]))}
       taxpayer=taxpayerRow
       rows=(links||[]).map((link:any)=>({...link,mtd_agents:agentsById.get(String(link.agent_id))||null}))
       agentConnections=connections||[]
+      existingAgents=firmAgents||[]
     }
   }catch(error:any){
     unavailable=error?.message||'Database configuration is temporarily unavailable.'
@@ -50,8 +54,10 @@ export default async function AgentAuthorisationPage({params,searchParams}:{para
 
     <details className="panel" style={{marginTop:16,marginBottom:16}} open={Boolean(qs.error)}>
       <summary style={{cursor:'pointer',fontWeight:700,fontSize:'1.05rem',listStyle:'none',display:'flex',alignItems:'center',justifyContent:'space-between',gap:12}}><span>＋ Add new agent</span><span className="muted" style={{fontWeight:400,fontSize:'.9rem'}}>Open form</span></summary>
-      <div style={{marginTop:18}}><h2>Add or authorise an agent</h2><p className="muted">HMRC authorisation and MTD Lab permissions are separate controls. Recording an agent here does not itself create HMRC authority. Use the HMRC Agent Services Account relationship where required, then record the relevant reference here.</p>
-        <form method="post" action="/api/agents/authorise"><input type="hidden" name="taxpayerId" value={id}/><div className="two"><div><label>Agent name</label><input className="field" name="agentName" required/></div><div><label>Organisation</label><input className="field" name="organisationName"/></div></div><div className="two"><div><label>HMRC Agent Reference Number</label><input className="field" name="hmrcArn" placeholder="Optional until verified"/></div><div><label>Authorisation reference</label><input className="field" name="authorisationReference" placeholder="HMRC or internal reference"/></div></div><div className="two"><div><label>Email</label><input className="field" type="email" name="email"/></div><div><label>Authorisation expires</label><input className="field" type="date" name="expiresAt"/></div></div><h3>Permissions</h3><div className="detailGrid"><label><input type="checkbox" name="canViewRecords" defaultChecked/> View digital records</label><label><input type="checkbox" name="canManageRecords"/> Manage digital records</label><label><input type="checkbox" name="canViewObligations" defaultChecked/> View HMRC obligations</label><label><input type="checkbox" name="canSubmitQuarterly"/> Submit quarterly updates</label><label><input type="checkbox" name="canManageYearEnd"/> Manage year end</label><label><input type="checkbox" name="canSubmitFinalDeclaration"/> Submit Final Declaration</label></div><label>Notes</label><textarea className="field" name="notes" rows={3}/><button className="btn" type="submit">Authorise agent</button></form>
+      <div style={{marginTop:18}}><h2>Add or authorise an agent</h2><p className="muted">Select an existing firm agent, then record only this taxpayer's authorisation and permissions. HMRC authority remains a separate control.</p>
+        <form method="post" action="/api/agents/authorise"><input type="hidden" name="taxpayerId" value={id}/>{existingAgents.length>0&&<><label htmlFor="existingAgentId">Existing firm agent</label><select className="field" id="existingAgentId" name="existingAgentId" defaultValue=""><option value="">Choose an existing agent</option>{existingAgents.map((agent:any)=><option key={agent.id} value={agent.id}>{agent.agent_name}{agent.organisation_name?` · ${agent.organisation_name}`:''}{agent.hmrc_arn?` · ARN ${agent.hmrc_arn}`:''}</option>)}</select><p className="muted">Choose an agent here to reuse their existing name, organisation, ARN, email and ASA connection.</p></>}
+        <details style={{margin:'16px 0'}}><summary style={{cursor:'pointer',fontWeight:700}}>Agent not listed? Create a new agent</summary><div style={{marginTop:12}}><div className="two"><div><label>Agent name</label><input className="field" name="agentName"/></div><div><label>Organisation</label><input className="field" name="organisationName"/></div></div><div className="two"><div><label>HMRC Agent Reference Number</label><input className="field" name="hmrcArn" placeholder="Optional until verified"/></div><div><label>Email</label><input className="field" type="email" name="email"/></div></div></div></details>
+        <div className="two"><div><label>Authorisation reference</label><input className="field" name="authorisationReference" placeholder="HMRC or internal reference"/></div><div><label>Authorisation expires</label><input className="field" type="date" name="expiresAt"/></div></div><h3>Permissions</h3><div className="detailGrid"><label><input type="checkbox" name="canViewRecords" defaultChecked/> View digital records</label><label><input type="checkbox" name="canManageRecords"/> Manage digital records</label><label><input type="checkbox" name="canViewObligations" defaultChecked/> View HMRC obligations</label><label><input type="checkbox" name="canSubmitQuarterly"/> Submit quarterly updates</label><label><input type="checkbox" name="canManageYearEnd"/> Manage year end</label><label><input type="checkbox" name="canSubmitFinalDeclaration"/> Submit Final Declaration</label></div><label>Notes</label><textarea className="field" name="notes" rows={3}/><button className="btn" type="submit">Authorise agent</button></form>
       </div>
     </details>
   </main></div>
