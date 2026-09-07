@@ -105,3 +105,12 @@ test('intent to finalise and Final Declaration routes enforce the shared server 
   assert.match(calculationPage,/!readiness\.canFinalise/)
   assert.match(calculationPage,/select\('period_start,period_end,status'\)/)
 })
+
+test('end of year checklist recognises an accepted HMRC calculation retrieval',()=>{
+  const page=readFileSync('app/taxpayers/[id]/end-of-year/page.tsx','utf8')
+
+  assert.match(page,/eq\('event_type','tax_calculation_retrieval'\)/)
+  assert.match(page,/eq\('status','accepted'\)/)
+  assert.match(page,/calculationReady\?'Retrieved':'Required'/)
+  assert.doesNotMatch(page,/<span className="statusPill statusOpen">Required<\/span>/)
+})
