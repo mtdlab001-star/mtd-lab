@@ -88,9 +88,22 @@ const guides:Guide[]=[
     summary:'Prepare and send cumulative figures for an eligible period.',
     steps:[
       'Synchronise HMRC and open Quarterly Obligations.',
-      'Wait until the period has ended. Future periods display an availability date and cannot be selected.',
-      'Open Submit for the eligible period, review cumulative income and expenses, then confirm the declaration.',
+      'Open a future quarter to prepare and review cumulative figures in advance. Preparation mode does not send anything to HMRC.',
+      'Wait until the displayed availability date before submitting. MTD Lab checks the period date again on the server.',
+      'For an eligible period, review cumulative income and expenses, check readiness, then submit.',
       'After HMRC accepts the update, synchronise again to refresh the obligation status.',
+    ],
+  },
+  {
+    id:'acting-capacity',
+    category:'Quarterly updates',
+    title:'Choose and save the acting capacity',
+    summary:'Prepare a direct or delegated quarterly filing safely.',
+    steps:[
+      'On the quarterly review page, choose Taxpayer connection for a direct filing.',
+      'Choose a connected authorised agent only when that agent is acting for the submission and has quarterly permission.',
+      'Wait for Selection saved before leaving the page.',
+      'When the page is reopened, confirm the saved acting capacity before submission.',
     ],
   },
   {
@@ -122,9 +135,35 @@ const guides:Guide[]=[
     title:'File through an Agent Services Account',
     summary:'Use a connected agent relationship without asking the client to reconnect HMRC for every filing.',
     steps:[
-      'Connect the agent organisation to its HMRC Agent Services Account.',
-      'Confirm the client has authorised that agent for MTD Income Tax.',
-      'Assign the required MTD Lab permissions, then select the agent acting capacity when preparing the filing.',
+      'Open the firm Agents page to review active agents, or open Agent Authorisation inside a taxpayer workspace.',
+      'Select an existing firm agent where possible, then grant only the permissions required for that taxpayer.',
+      'Connect the agent to its HMRC Agent Services Account and confirm the HMRC client relationship.',
+      'Select the agent acting capacity on the review page and wait for Selection saved.',
+    ],
+  },
+  {
+    id:'release-readiness',
+    category:'Release readiness',
+    title:'Complete Stage 2 release readiness',
+    summary:'Collect controlled sandbox evidence while production remains locked.',
+    steps:[
+      'Open Release readiness from the main navigation and review every pending control.',
+      'Obtain accepted sandbox evidence for each applicable income source and every HMRC business ID.',
+      'Complete at least one accepted direct quarterly filing and the required delegated agent filing evidence.',
+      'Synchronise HMRC, confirm fulfilled obligations, then download the evidence pack when it becomes available.',
+      'Keep production submissions locked until every readiness control passes and formal approval is complete.',
+    ],
+  },
+  {
+    id:'archive-capacity',
+    category:'Workspace management',
+    title:'Manage taxpayers and client capacity',
+    summary:'Archive safely, restore clients and understand account capacity.',
+    steps:[
+      'Use Archive to remove a taxpayer from active lists without deleting HMRC connections, obligations, submissions or audit history.',
+      'Open View archived clients to restore an archived workspace.',
+      'Use Remove only when permanent deletion is intended and confirm the exact taxpayer name.',
+      'Open Plans and Billing to review used spaces, remaining capacity, annual bundles and billing history.',
     ],
   },
   {
