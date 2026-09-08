@@ -18,11 +18,13 @@ export default async function ReviewPage({params,searchParams}:{params:Promise<{
  const {id}=await params;const qs=await searchParams;const token=String(qs.data||'');const p:any=verifyReviewPayload(token)
  if(!p||p.taxpayerId!==id)return <main className="main"><h1>Quarterly update</h1><p>Review data is missing, invalid or has been altered.</p><Link className="btn" href={`/taxpayers/${id}/submissions`}>Return to Submission Centre</Link></main>
  const db=supabaseAdmin();const workspace=await currentWorkspace();const firmId=workspace?.firmId||''
- const [{data:agentRowsRaw,error:agentRowsError},{data:submissionRow}]=await Promise.all([
+ const [{data:agentRowsRaw,error:agentRowsError},{data:submissionRow},{data:savedDraft,error:savedDraftError}]=await Promise.all([
   firmId?db.from('mtd_agent_authorisations').select('agent_id,expires_at').eq('taxpayer_id',id).eq('firm_id',firmId).eq('status','authorised').eq('can_submit_quarterly',true):Promise.resolve({data:[],error:null} as any),
-  qs.submissionId&&firmId?db.from('hmrc_quarterly_submissions').select('id,status,response_payload,error_message,hmrc_correlation_id').eq('id',qs.submissionId).eq('taxpayer_id',id).eq('firm_id',firmId).maybeSingle():Promise.resolve({data:null} as any)
+  qs.submissionId&&firmId?db.from('hmrc_quarterly_submissions').select('id,status,response_payload,error_message,hmrc_correlation_id').eq('id',qs.submissionId).eq('taxpayer_id',id).eq('firm_id',firmId).maybeSingle():Promise.resolve({data:null} as any),
+  firmId?db.from('hmrc_quarterly_drafts').select('figures').eq('firm_id',firmId).eq('taxpayer_id',id).eq('business_id',String(p.businessId||'')).eq('income_source_type',String(p.incomeSourceType||p.filingType||'self-employment')).eq('period_end',String(p.periodEnd||'')).maybeSingle():Promise.resolve({data:null,error:null} as any)
  ])
  if(agentRowsError)throw agentRowsError
+ if(savedDraftError)throw savedDraftError
  const agentIdsForReview=Array.from(new Set((agentRowsRaw||[]).map((r:any)=>String(r.agent_id||'')).filter(Boolean)))
  const {data:agentRecords,error:agentRecordsError}=agentIdsForReview.length&&firmId?await db.from('mtd_agents').select('id,agent_name,organisation_name,hmrc_arn,status').eq('firm_id',firmId).in('id',agentIdsForReview):{data:[] as any[],error:null}
  if(agentRecordsError)throw agentRecordsError
@@ -33,8 +35,10 @@ export default async function ReviewPage({params,searchParams}:{params:Promise<{
  const {data:connectionRows}=activeAgentIds.length&&firmId?await db.from('agent_hmrc_connections').select('agent_id,access_token,refresh_token').eq('firm_id',firmId).in('agent_id',activeAgentIds):{data:[] as any[]}
  const connectedIds=new Set((connectionRows||[]).filter((r:any)=>r.access_token||r.refresh_token).map((r:any)=>String(r.agent_id)))
  const agents=activeAgents.filter((r:any)=>connectedIds.has(String(r.agent_id)))
- const requestedActingAgentId=String(p.actingAgentId||'')
- const defaultActingAgentId=Object.prototype.hasOwnProperty.call(p,'actingAgentId')?(requestedActingAgentId&&agents.some((r:any)=>String(r.agent_id)===requestedActingAgentId)?requestedActingAgentId:''):(agents.length===1?String(agents[0].agent_id):'')
+ const savedFigures=savedDraft?.figures&&typeof savedDraft.figures==='object'?savedDraft.figures:{}
+ const capacitySource=Object.prototype.hasOwnProperty.call(savedFigures,'actingAgentId')?savedFigures:p
+ const requestedActingAgentId=String(capacitySource.actingAgentId||'')
+ const defaultActingAgentId=Object.prototype.hasOwnProperty.call(capacitySource,'actingAgentId')?(requestedActingAgentId&&agents.some((r:any)=>String(r.agent_id)===requestedActingAgentId)?requestedActingAgentId:''):(agents.length===1?String(agents[0].agent_id):'')
  const sourceType=String(p.incomeSourceType||p.filingType||'self-employment')
  const foreign=sourceType==='foreign-property';const ukProperty=sourceType==='uk-property'||(!p.incomeSourceType&&p.filingType==='property');const property=foreign||ukProperty
  const sourceLabel=foreign?'Foreign Property':ukProperty?'UK Property':'Self Employment'
