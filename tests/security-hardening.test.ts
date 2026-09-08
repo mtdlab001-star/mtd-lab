@@ -195,7 +195,8 @@ test('quarterly acting capacity is persisted with firm scoped validation',()=>{
   assert.match(route,/\.eq\('firm_id',workspace\.firmId\)/)
   assert.match(route,/can_submit_quarterly/)
   assert.match(route,/actingAgentId/)
-  assert.match(review,/Object\.prototype\.hasOwnProperty\.call\(p,'actingAgentId'\)/)
+  assert.match(review,/hmrc_quarterly_drafts/)
+  assert.match(review,/capacitySource=Object\.prototype\.hasOwnProperty\.call\(savedFigures,'actingAgentId'\)/)
   assert.match(selector,/\/api\/hmrc\/quarterly\/draft/)
 })
 
