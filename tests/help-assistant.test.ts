@@ -26,6 +26,25 @@ test('fallback assistant keeps unknown questions within product scope',()=>{
   assert.match(answer,/Help Centre/i)
 })
 
+test('fallback assistant explains preparation mode without bypassing eligibility',()=>{
+  const answer=fallbackHelpAnswer('What does preparation mode mean for a future quarter?')
+  assert.match(answer,/does not send anything to HMRC/i)
+  assert.match(answer,/submission becomes available/i)
+})
+
+test('fallback assistant explains saved acting capacity',()=>{
+  const answer=fallbackHelpAnswer('How do I save the acting capacity?')
+  assert.match(answer,/Taxpayer connection/i)
+  assert.match(answer,/Selection saved/i)
+  assert.match(answer,/preserves that choice/i)
+})
+
+test('fallback assistant explains the release readiness gate',()=>{
+  const answer=fallbackHelpAnswer('Why is release readiness validation incomplete?')
+  assert.match(answer,/accepted sandbox submissions/i)
+  assert.match(answer,/production submissions locked/i)
+})
+
 test('AI Help is hidden on public pre-login pages only',()=>{
   assert.equal(shouldShowAIHelp('/login'),false)
   assert.equal(shouldShowAIHelp('/login?next=%2Ftaxpayers'),false)
