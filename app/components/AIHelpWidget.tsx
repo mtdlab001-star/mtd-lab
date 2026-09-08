@@ -11,20 +11,23 @@ type ChatMessage={
   text:string
 }
 
-const welcome:ChatMessage={
-  id:'welcome',
-  role:'assistant',
-  text:'Hello, I am MTD Lab AI Help. Ask me how to use any part of the app.',
-}
+const welcome:ChatMessage={id:'welcome',role:'assistant',text:'Hello. I can guide you through the current MTD Lab screen and filing workflow. What would you like to do?'}
 
-const suggestions=[
-  'How do I connect HMRC?',
-  'When can I submit a quarterly update?',
-  'How do I complete year end?',
-]
+function suggestionsFor(pathname:string){
+  if(pathname==='/release-readiness')return ['What do the readiness checks mean?','Why are quarterly checks pending?','When can production be enabled?']
+  if(pathname.includes('/quarterly/review'))return ['Which acting capacity should I select?','Why is HMRC submission locked?','How do I check submission readiness?']
+  if(pathname.includes('/submissions'))return ['How do I prepare a future quarter?','How do I import an Excel template?','How are cumulative figures calculated?']
+  if(pathname.includes('/quarterly'))return ['What do the obligation statuses mean?','When can I submit a quarterly update?','How do I refresh fulfilled obligations?']
+  if(pathname.includes('/agents'))return ['How do I authorise an existing agent?','What is an ASA connection?','Which agent permissions are required?']
+  if(pathname.includes('/digital-records'))return ['How do I add digital records?','How do I import a CSV file?','Which income source should I use?']
+  if(pathname.includes('/end-of-year')||pathname.includes('/calculations'))return ['How do I complete year end?','How do I retrieve the HMRC calculation?','When is Final Declaration available?']
+  if(pathname==='/taxpayers')return ['How do I add a sandbox taxpayer?','What is the difference between Archive and Remove?','How does client capacity work?']
+  return ['How do I connect HMRC?','How do I prepare a quarterly update?','What does Release readiness mean?']
+}
 
 export default function AIHelpWidget(){
   const pathname=usePathname()
+  const suggestions=suggestionsFor(pathname)
   const [open,setOpen]=useState(false)
   const [input,setInput]=useState('')
   const [messages,setMessages]=useState<ChatMessage[]>([welcome])
