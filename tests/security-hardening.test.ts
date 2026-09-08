@@ -185,6 +185,20 @@ test('taxpayer authorisation can safely reuse an existing firm agent',()=>{
   assert.match(route,/else if\(!existingAgentId\)/)
 })
 
+test('quarterly acting capacity is persisted with firm scoped validation',()=>{
+  const route=readFileSync('app/api/hmrc/quarterly/draft/route.ts','utf8')
+  const review=readFileSync('app/taxpayers/[id]/quarterly/review/page.tsx','utf8')
+  const selector=readFileSync('app/taxpayers/[id]/quarterly/review/ActingCapacitySelect.tsx','utf8')
+  assert.match(route,/export async function POST/)
+  assert.match(route,/isSameOriginRequest/)
+  assert.match(route,/mtd_agent_authorisations/)
+  assert.match(route,/\.eq\('firm_id',workspace\.firmId\)/)
+  assert.match(route,/can_submit_quarterly/)
+  assert.match(route,/actingAgentId/)
+  assert.match(review,/Object\.prototype\.hasOwnProperty\.call\(p,'actingAgentId'\)/)
+  assert.match(selector,/\/api\/hmrc\/quarterly\/draft/)
+})
+
 test('delegated agent relationship controls are firm scoped and audited',()=>{
   const route=readFileSync('app/api/agents/hmrc-relationship/route.ts','utf8')
   const revoke=readFileSync('app/api/agents/revoke/route.ts','utf8')
