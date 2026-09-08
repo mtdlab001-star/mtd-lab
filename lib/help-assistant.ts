@@ -23,7 +23,11 @@ const topics:HelpTopic[]=[
   },
   {
     keywords:['taxpayer','nino','mtd income tax id','test user'],
-    answer:'Create an individual test user in the HMRC Developer Hub. In MTD Lab, open Taxpayers and add the NINO and MTD Income Tax ID. Keep the Government Gateway test password outside MTD Lab because it is entered only on HMRC pages.',
+    answer:'For sandbox testing, open Sandbox setup, create an individual test user with HMRC, then add the generated NINO and MTD Income Tax ID to MTD Lab. The Government Gateway test password is used only on HMRC pages and must not be stored in MTD Lab.',
+  },
+  {
+    keywords:['dashboard','overview','due','recent submission','current date'],
+    answer:'The Dashboard summarises taxpayer workspaces, HMRC income sources, due obligations and accepted quarterly submissions. Select Taxpayers to open a client. Administrators can also open Agents, Sandbox setup, Plans and Billing, or Release readiness from the main navigation.',
   },
   {
     keywords:['digital record','income','expense','spreadsheet','template','import','transaction'],
@@ -31,7 +35,15 @@ const topics:HelpTopic[]=[
   },
   {
     keywords:['quarter','quarterly','obligation','submit update','not due','fulfilled','submitted'],
-    answer:'Synchronise HMRC and open Quarterly Obligations. A quarterly update can be submitted only after its period has ended. Fulfilled means HMRC reports it complete. Submitted means MTD Lab has an accepted update while HMRC may still show the obligation as open. Synchronise again after acceptance.',
+    answer:'Synchronise HMRC and open Quarterly Obligations. You may prepare and review cumulative figures for a future quarter, but an update can be submitted only after its period has ended. After HMRC accepts an eligible update, synchronise again so the obligation can change to Fulfilled.',
+  },
+  {
+    keywords:['preparation mode','prepare future','future quarter','availability date','period ended','locked'],
+    answer:'Preparation mode lets you enter, import and review cumulative figures before the quarter becomes eligible. It does not send anything to HMRC. The review page displays the exact date submission becomes available, and the server checks eligibility again before any transmission.',
+  },
+  {
+    keywords:['acting capacity','taxpayer connection','agent connection','selection saved','parker'],
+    answer:'On the review page, choose Taxpayer connection for a direct filing or choose a connected authorised agent for delegated filing. Wait for Selection saved before leaving. MTD Lab preserves that choice with the draft and validates the agent permission and ASA connection again before submission.',
   },
   {
     keywords:['year end','final declaration','calculation','tax calculation','annual adjustment','loss','relief'],
@@ -39,7 +51,19 @@ const topics:HelpTopic[]=[
   },
   {
     keywords:['agent','asa','agent services account','client authorisation'],
-    answer:'Connect the organisation to its HMRC Agent Services Account, confirm the client has authorised that agent for MTD Income Tax, assign the required MTD Lab permissions, then select the agent acting capacity when preparing the filing.',
+    answer:'Open Agents to review the firm register. For a taxpayer, open Agent Authorisation, select an existing firm agent or create one, grant only the required permissions, connect the ASA, then check or create the HMRC client relationship. All required controls must be valid before delegated filing.',
+  },
+  {
+    keywords:['release readiness','release ready','10 of 14','validation incomplete','evidence pack','production lock'],
+    answer:'Release readiness records the sandbox evidence required before production capability can be considered. Pending quarterly controls require accepted sandbox submissions for every applicable lane and business ID, including direct and delegated routes. Keep production submissions locked until every control passes and approval is complete.',
+  },
+  {
+    keywords:['archive','restore','remove taxpayer','delete taxpayer','client capacity','billing','bundle'],
+    answer:'Use Archive to hide a taxpayer without deleting its HMRC connections, obligations, submissions or audit history. Restore archived clients from View archived clients. Use Remove only for intentional permanent deletion. Plans and Billing shows the firm client allowance and available annual bundles, but payments remain unavailable during pre launch.',
+  },
+  {
+    keywords:['history','submission history','evidence pack','download evidence','audit'],
+    answer:'Open View submission history to inspect stored quarterly attempts and accepted results. Once accepted taxpayer evidence exists, Release readiness provides a downloadable evidence pack containing the recorded submission and calculation information for review.',
   },
   {
     keywords:['no record','not found','empty response'],
@@ -65,19 +89,29 @@ Safety rules:
 6. When unsure, direct the user to the Help Centre or support@mtdlab.co.uk and ask them to include the page, time and correlation ID, never credentials.
 
 Product guidance:
+• Dashboard: shows taxpayer workspaces, income sources, due obligations, accepted quarterly submissions and the current date.
+• Main firm navigation: Dashboard, Taxpayers, Plans and Billing, Agents, Sandbox setup and Release readiness. Firm access is available only to the super administrator.
 • Sign in: use the administrator supplied MTD Lab username and password. The eye button shows or hides newly typed text. MTD Lab cannot reveal a saved password.
-• Taxpayers: create an HMRC sandbox individual test user, then add its NINO and MTD Income Tax ID in Taxpayers.
+• Taxpayers: active clients can be opened, archived safely or permanently removed with confirmation. Archived clients can be restored. Client capacity is shown above the list.
+• Sandbox setup: create an HMRC sandbox individual test user, add its NINO and MTD Income Tax ID, then follow the Stage 2 validation checklist. Never use sandbox reset unless deliberate deletion of local test data is intended.
 • HMRC connection: select Connect or Reconnect to HMRC, complete consent on HMRC, then select Synchronise now.
 • API warnings: add the named API version to the same HMRC Developer Hub application, reconnect, then retry.
-• Digital records: keep Self Employment, UK Property and Foreign Property records in their matching source. Manual entry and spreadsheet import are supported.
-• Quarterly updates: synchronise, open Quarterly Obligations, wait until the period has ended, review cumulative figures, submit and synchronise again. Never advise submitting before the period end.
+• Income sources: HMRC businesses are separated into Self Employment, UK Property and Foreign Property lanes. The raw HMRC business ID appears beneath the readable name.
+• Digital records: keep records in their matching income source. Manual entry, CSV import, evidence upload and source specific templates are supported.
+• Submission Centre: prepare each income source separately, choose the cumulative quarter, enter figures or import the matching Excel template, then review the totals.
+• Future quarters: preparation and review are allowed before eligibility. Actual HMRC submission remains locked until the period has fully ended. Never suggest bypassing this date gate.
+• Acting capacity: choose Taxpayer connection for a direct filing, or a connected authorised agent for delegated filing. Wait for Selection saved. The saved choice must persist when the review page is reopened.
+• Quarterly updates: after the period ends, check submission readiness, submit the reviewed cumulative figures, inspect the result, then synchronise HMRC again.
 • Statuses: Fulfilled means HMRC reports completion. Submitted means MTD Lab has an accepted update but HMRC may still show the obligation open. Not due yet means submission is unavailable. Open means eligible and outstanding.
 • Year end: review adjustments, losses, employment, state benefits, other income, reliefs and liability adjustments. Complete obligations, retrieve the calculation and send the Final Declaration only after the tax year ends and all checks pass.
-• Agents: connect the Agent Services Account, confirm client authorisation and MTD Lab permissions, then use the correct acting capacity.
+• Agents: the firm register, taxpayer authorisation, action permissions, ASA software connection and HMRC client relationship are separate controls. Reuse an existing firm agent when appropriate and grant only necessary permissions.
+• Release readiness: keep production submissions locked while collecting sandbox evidence. Applicable income source lanes, every business ID, direct filing and delegated filing must have accepted evidence before the quarterly controls pass.
+• Plans and Billing: displays client capacity, annual bundles and history. Payments and checkout remain disabled during pre launch.
+• Evidence: submission history and downloadable evidence packs preserve accepted quarterly and calculation records for audit support.
 • No record found: verify identifiers and tax year, synchronise and retry. It may be a valid empty HMRC response.
 • Support: use support@mtdlab.co.uk and include the page, time and correlation ID. Never include credentials.
 
-Main navigation areas include Dashboard, Taxpayers, Taxpayer Overview, Digital Records, Quarterly Obligations, Submission Centre, Annual Adjustments, Employment Income, State Benefits, Other Income, Reliefs and Deductions, Tax Calculation, Agents and Help Centre.
+Taxpayer navigation is grouped into Access, HMRC, MTD Income Tax, Income Sources and MTD Filing. It includes Agent Authorisation, Digital Records, All Businesses, Self Employment, UK Property, Foreign Property, Submission Centre, Quarterly Updates, HMRC Tax Calculation, End of Year, Annual Adjustments and Losses, Tax Liability Adjustments, Reliefs and Deductions, Other Income, State Benefits and Employment Income.
 `.trim()
 
 export function fallbackHelpAnswer(question:string){
@@ -89,6 +123,5 @@ export function fallbackHelpAnswer(question:string){
     const matches=topic.keywords.filter(keyword=>normalized.includes(keyword)).length
     if(matches>score){best=topic;score=matches}
   }
-  return best?.answer||'I can help with MTD Lab sign in, HMRC connections, taxpayers, digital records, quarterly updates, year end, agents and troubleshooting. Try asking what you want to do, or open the full Help Centre for step by step guides.'
+  return best?.answer||'MTD Lab AI Help can guide you through the Dashboard, taxpayers, HMRC connections, income sources, digital records, quarterly preparation, acting capacity, agents, year end, release readiness, client capacity and troubleshooting. Tell me the page you are viewing and what you want to complete, or open the Help Centre for full guides.'
 }
-
