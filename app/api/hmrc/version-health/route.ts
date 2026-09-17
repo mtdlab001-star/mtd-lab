@@ -9,6 +9,9 @@ export async function GET(){
     checkedAt:new Date().toISOString(),
     environment:process.env.HMRC_ENVIRONMENT||'sandbox',
     automaticProductionUpgrade:false,
+    verification:'Configured version registry, not a live HMRC endpoint acceptance test',
+    compatibilityBaseline:'2026-09-16',
+    sandboxOnlyFeatures:['firstYearAllowanceOnPlantAndMachinery','taxRefundedOrSetOff','Other Income v3','Individual Calculations v9'],
     versions:hmrcApiVersionSnapshot(),
   },{
     headers:{'Cache-Control':'no-store'}

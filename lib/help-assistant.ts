@@ -46,6 +46,10 @@ const topics:HelpTopic[]=[
     answer:'On the review page, choose Taxpayer connection for a direct filing or choose a connected authorised agent for delegated filing. Wait for Selection saved before leaving. MTD Lab preserves that choice with the draft and validates the agent permission and ASA connection again before submission.',
   },
   {
+    keywords:['class 4','first year allowance','plant and machinery','winter fuel','compatibility updates'],
+    answer:'Open Annual Adjustments and Losses, then Prepare annual adjustments and allowances. Class 4 profit adjustments apply to Self Employment. Plant and machinery first year allowances apply to Self Employment and UK Property and are currently sandbox only. Prepare and review the changes, choose the acting capacity, and submit only after the tax year ends and readiness checks pass. Existing annual data is preserved. HMRC Tax Calculation shows a Winter Fuel Payment charge when HMRC returns it, without adding it again to the total.',
+  },
+  {
     keywords:['year end','final declaration','calculation','tax calculation','annual adjustment','loss','relief'],
     answer:'At year end, review business adjustments, losses, employment, state benefits, other income, reliefs and tax liability adjustments. Confirm all quarterly obligations are complete, retrieve and check the HMRC calculation, then send the Final Declaration only after the tax year has ended and every readiness check passes.',
   },
@@ -104,6 +108,7 @@ Product guidance:
 • Quarterly updates: after the period ends, check submission readiness, submit the reviewed cumulative figures, inspect the result, then synchronise HMRC again.
 • Statuses: Fulfilled means HMRC reports completion. Submitted means MTD Lab has an accepted update but HMRC may still show the obligation open. Not due yet means submission is unavailable. Open means eligible and outstanding.
 • Year end: review adjustments, losses, employment, state benefits, other income, reliefs and liability adjustments. Complete obligations, retrieve the calculation and send the Final Declaration only after the tax year ends and all checks pass.
+• September 2026 compatibility: Annual Adjustments and Losses links to Prepare annual adjustments and allowances. Class 4 profit adjustment is Self Employment only. Plant and machinery first year allowance is Self Employment and UK Property only and currently sandbox only. Saved reviews expire after 30 minutes. Existing annual entries are retrieved and preserved before PUT. Preparation is not HMRC acceptance. Calculation results show Winter Fuel Payment charge only when returned by HMRC and never add it again to totals. Calculations remains version 8. Other Income version 3 and tax refunds or set offs are sandbox only. Never suggest enabling sandbox features in production.
 • Agents: the firm register, taxpayer authorisation, action permissions, ASA software connection and HMRC client relationship are separate controls. Reuse an existing firm agent when appropriate and grant only necessary permissions.
 • Release readiness: keep production submissions locked while collecting sandbox evidence. Applicable income source lanes, every business ID, direct filing and delegated filing must have accepted evidence before the quarterly controls pass.
 • Plans and Billing: displays client capacity, annual bundles and history. Payments and checkout remain disabled during pre launch.

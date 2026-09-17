@@ -1,3 +1,4 @@
+import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 import { NextResponse } from 'next/server'
 import { isSameOriginRequest } from '@/lib/request-security'
 import { currentWorkspace } from '@/lib/workspace'
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'Accept': 'application/vnd.hmrc.1.0+json',
+      'Accept': hmrcAcceptHeader('testUsers'),
       'Authorization': `Bearer ${tokenData.access_token}`,
     },
     body: JSON.stringify({ serviceNames: ['agent-services'] }),

@@ -1,3 +1,4 @@
+import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcApiBase } from '@/lib/hmrc'
@@ -36,7 +37,7 @@ export async function POST(req:Request){
  try{
   const res=await fetch(`${hmrcApiBase}/individuals/self-assessment/adjustable-summary/${encodeURIComponent(taxpayer.nino)}/trigger`,{
    method:'POST',
-   headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.hmrc.7.0+json','Content-Type':'application/json',...(process.env.HMRC_ENVIRONMENT==='production'?{}:{'Gov-Test-Scenario':'DEFAULT'}),...fraud.headers},
+   headers:{Authorization:`Bearer ${token}`,Accept:hmrcAcceptHeader('bsas'),'Content-Type':'application/json',...(process.env.HMRC_ENVIRONMENT==='production'?{}:{'Gov-Test-Scenario':'DEFAULT'}),...fraud.headers},
    body:JSON.stringify(payload),cache:'no-store'
   })
   const text=await res.text();let body:any={};try{body=text?JSON.parse(text):{}}catch{body={raw:text}}

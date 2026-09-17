@@ -115,7 +115,7 @@ export default async function TaxLiabilityPage({params,searchParams}:{params:Pro
     <div style={{borderTop:'1px solid #24385f',margin:'24px 0 20px'}}/>
 
     <h3>Tax refunded or set off</h3>
-    <p className="muted">Record an amount only where HMRC has already refunded the tax or set it against another liability.</p>
+    <p className="muted">Sandbox testing only under the September 2026 release. Record an amount only where HMRC has already refunded the tax or set it against another liability. Production submission of this field is blocked.</p>
     <div style={{display:'grid',gridTemplateColumns:'minmax(250px,520px)',gap:18,marginTop:14}}>
      <MoneyField name="taxRefundedOrSetOff" label="Amount already refunded or set off" help="Total amount already repaid or offset by HMRC in relation to this adjustment."/>
     </div>

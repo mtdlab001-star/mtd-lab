@@ -1,3 +1,4 @@
+import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { getValidAgentHmrcAccessToken } from '@/lib/hmrc-connection'
@@ -6,8 +7,8 @@ import { isSameOriginRequest } from '@/lib/request-security'
 import { buildFraudHeaders } from '@/lib/hmrc-fraud'
 import { currentWorkspace } from '@/lib/workspace'
 
-const ACCEPT_V1='application/vnd.hmrc.1.0+json'
-const ACCEPT_V2='application/vnd.hmrc.2.0+json'
+const ACCEPT_V1=hmrcAcceptHeader('agentClientRelationships')
+const ACCEPT_V2=hmrcAcceptHeader('agentAuthorisation')
 
 function cleanPostcode(value:string){return value.trim().toUpperCase().replace(/\s+/g,' ')}
 function cleanArn(value:string){return value.trim().toUpperCase().replace(/\s+/g,'')}

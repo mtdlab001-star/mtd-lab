@@ -1,3 +1,4 @@
+import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 import { NextResponse } from 'next/server'
 import { hmrcApiBase } from '@/lib/hmrc'
 import { getValidHmrcAccessToken } from '@/lib/hmrc-connection'
@@ -41,7 +42,7 @@ export async function POST(req:Request){
       method:'POST',
       headers:{
         Authorization:`Bearer ${accessToken}`,
-        Accept:'application/vnd.hmrc.1.0+json',
+        Accept:hmrcAcceptHeader('testSupport'),
         'Content-Type':'application/json',
         ...fraud.headers
       },

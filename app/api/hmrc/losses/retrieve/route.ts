@@ -1,3 +1,4 @@
+import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 import { NextResponse } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase-admin'
 import { hmrcApiBase } from '@/lib/hmrc'
@@ -28,7 +29,7 @@ export async function POST(req:Request){
  if(fraud.missing.length){back.searchParams.set('error',`Missing HMRC fraud prevention data: ${fraud.missing.join(', ')}`);return NextResponse.redirect(back,303)}
  try{
   const endpoint=`/individuals/losses/${encodeURIComponent(taxpayer.nino)}/businesses/${encodeURIComponent(businessId)}/loss-claims/${encodeURIComponent(taxYear)}`
-  const res=await fetch(`${hmrcApiBase}${endpoint}`,{headers:{Authorization:`Bearer ${token}`,Accept:'application/vnd.hmrc.7.0+json',...(process.env.HMRC_ENVIRONMENT==='production'?{}:{'Gov-Test-Scenario':'DEFAULT'}),...fraud.headers},cache:'no-store'})
+  const res=await fetch(`${hmrcApiBase}${endpoint}`,{headers:{Authorization:`Bearer ${token}`,Accept:hmrcAcceptHeader('losses'),...(process.env.HMRC_ENVIRONMENT==='production'?{}:{'Gov-Test-Scenario':'DEFAULT'}),...fraud.headers},cache:'no-store'})
   const text=await res.text();let body:any={};try{body=text?JSON.parse(text):{}}catch{body={raw:text}}
   const correlationId=res.headers.get('x-correlationid')||res.headers.get('x-correlation-id')||''
   const retrievalId=await recordHmrcResponse(db,{taxpayerId,taxYear,eventType:'losses_retrieval',status:res.ok?'accepted':'rejected',payload:body,correlationId,hmrcStatus:res.status,requestSummary:{businessId}})

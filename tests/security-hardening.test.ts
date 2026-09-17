@@ -264,7 +264,7 @@ test('HMRC test business creation is sandbox only and restricted to property typ
   assert.match(source,/process\.env\.HMRC_ENVIRONMENT==='production'/)
   assert.match(source,/new Set\(\['uk-property','foreign-property'\]\)/)
   assert.match(source,/individuals\/self-assessment-test-support\/business\/\$\{encodeURIComponent\(taxpayer\.nino\)\}/)
-  assert.match(source,/Accept:'application\/vnd\.hmrc\.1\.0\+json'/)
+  assert.match(source,/Accept:hmrcAcceptHeader\('testSupport'\)/)
   assert.match(source,/getValidHmrcAccessToken\(taxpayerId\)/)
   assert.match(source,/JSON\.stringify\(\{typeOfBusiness:businessType\}\)/)
 })
