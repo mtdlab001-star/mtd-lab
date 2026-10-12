@@ -5,22 +5,21 @@ import { useEffect, useMemo, useState } from 'react'
 
 type SourceType = 'self-employment' | 'uk-property' | 'foreign-property'
 type Props = { taxpayerId: string; active?: string; sourceTypes?: SourceType[] }
-type GroupKey = 'access' | 'hmrc' | 'mtd-income-tax' | 'income-sources' | 'mtd-filing'
+type GroupKey = 'start' | 'records' | 'filing' | 'more'
 type OpenGroups = Record<GroupKey, boolean>
 
 const closedGroups: OpenGroups = {
-  access: false,
-  hmrc: false,
-  'mtd-income-tax': false,
-  'income-sources': false,
-  'mtd-filing': false,
+  start: false,
+  records: false,
+  filing: false,
+  more: false,
 }
 
 function activeGroupFor(active?: string): GroupKey | null {
-  if (active === 'agents') return 'access'
-  if (active === 'digital-records') return 'mtd-income-tax'
-  if (['businesses', 'self-employment', 'property', 'foreign-property'].includes(active || '')) return 'income-sources'
-  if (['submissions', 'quarterly', 'calculations', 'end-of-year', 'adjustments', 'tax-liability', 'reliefs', 'other-income', 'state-benefits', 'employment', 'history'].includes(active || '')) return 'mtd-filing'
+  if (active === 'agents') return 'start'
+  if (['digital-records', 'businesses', 'self-employment', 'property', 'foreign-property'].includes(active || '')) return 'records'
+  if (['submissions', 'quarterly', 'calculations', 'end-of-year', 'history'].includes(active || '')) return 'filing'
+  if (['adjustments', 'tax-liability', 'reliefs', 'other-income', 'state-benefits', 'employment'].includes(active || '')) return 'more'
   return null
 }
 
@@ -73,33 +72,35 @@ export default function TaxpayerSidebar({ taxpayerId, active, sourceTypes }: Pro
   return <aside className="side">
     <div className="brand"><img className="brandLogo" src="/mtd-lab-logo-post-login.svg" alt="MTD Lab, Making Tax Digital for Income Tax"/></div>
     <nav className="nav" aria-label="Taxpayer navigation">
-      {item('dashboard', 'Dashboard', '/')}
-      {item('taxpayers', 'Taxpayers', '/taxpayers')}
-      {item('overview', 'Taxpayer Overview', `/taxpayers/${id}`)}
-      {group('access', 'Access', item('agents', 'Agent Authorisation', `/taxpayers/${id}/agents`))}
-      {group('hmrc', 'HMRC', <>
-        <Link href={`/taxpayers/${id}#connection`}>HMRC Authentication</Link>
-        <Link href={`/taxpayers/${id}#sync`}>Synchronise HMRC</Link>
+      {item('dashboard', 'Home', '/')}
+      {item('taxpayers', 'Clients', '/taxpayers')}
+      {item('overview', 'Client summary', `/taxpayers/${id}`)}
+      {group('start', 'Get started', <>
+        <Link href={`/taxpayers/${id}#connection`}>Connect to HMRC</Link>
+        <Link href={`/taxpayers/${id}#sync`}>Refresh HMRC details</Link>
+        {item('agents', 'Agent access', `/taxpayers/${id}/agents`)}
       </>)}
-      {group('mtd-income-tax', 'MTD Income Tax', item('digital-records', 'Digital Records', `/taxpayers/${id}/digital-records`))}
-      {group('income-sources', 'Income Sources', <>
-        {item('businesses', 'All Businesses', `/taxpayers/${id}/businesses`)}
+      {group('records', 'Records', <>
+        {item('digital-records', 'Income and expenses', `/taxpayers/${id}/digital-records`)}
+        {item('businesses', 'Income sources', `/taxpayers/${id}/businesses`)}
         {visibleSourceTypes.includes('self-employment') && item('self-employment', 'Self Employment', `/taxpayers/${id}/businesses?type=self-employment`)}
         {visibleSourceTypes.includes('uk-property') && item('property', 'UK Property', `/taxpayers/${id}/businesses?type=uk-property`)}
         {visibleSourceTypes.includes('foreign-property') && item('foreign-property', 'Foreign Property', `/taxpayers/${id}/businesses?type=foreign-property`)}
       </>)}
-      {group('mtd-filing', 'MTD Filing', <>
-        {item('submissions', 'Submission Centre', `/taxpayers/${id}/submissions`)}
+      {group('filing', 'Submit to HMRC', <>
+        {item('submissions', 'Prepare an update', `/taxpayers/${id}/submissions`)}
         {item('quarterly', 'Quarterly Updates', `/taxpayers/${id}/quarterly`)}
-        {item('calculations', 'HMRC Tax Calculation', `/taxpayers/${id}/calculations`)}
-        {item('end-of-year', 'End of Year', `/taxpayers/${id}/end-of-year`)}
-        {item('adjustments', 'Annual Adjustments & Losses', `/taxpayers/${id}/end-of-year/adjustments`)}
+        {item('end-of-year', 'Year end', `/taxpayers/${id}/end-of-year`)}
+        {item('calculations', 'Tax calculation', `/taxpayers/${id}/calculations`)}
+        {item('history', 'Previous submissions', `/taxpayers/${id}/quarterly/history`)}
+      </>)}
+      {group('more', 'More tax details', <>
+        {item('adjustments', 'Adjustments and losses', `/taxpayers/${id}/end-of-year/adjustments`)}
         {item('tax-liability', 'Tax Liability Adjustments', `/taxpayers/${id}/end-of-year/tax-liability`)}
-        {item('reliefs', 'Reliefs & Deductions', `/taxpayers/${id}/end-of-year/reliefs`)}
-        {item('other-income', 'Other SA Income', `/taxpayers/${id}/end-of-year/other-income`)}
+        {item('reliefs', 'Reliefs and deductions', `/taxpayers/${id}/end-of-year/reliefs`)}
+        {item('other-income', 'Other income', `/taxpayers/${id}/end-of-year/other-income`)}
         {item('state-benefits', 'State Benefits', `/taxpayers/${id}/end-of-year/state-benefits`)}
         {item('employment', 'Employment Income', `/taxpayers/${id}/end-of-year/employment`)}
-        {item('history', 'Submission History', `/taxpayers/${id}/quarterly/history`)}
       </>)}
     </nav>
     <div className="operator">Operated by Glomaxel IT Service</div>
