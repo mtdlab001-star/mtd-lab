@@ -7,9 +7,10 @@ type Props = {
   taxpayerId: string
   clientName: string
   archived?: boolean
+  returnToList?: boolean
 }
 
-export default function TaxpayerActions({ taxpayerId, clientName, archived = false }: Props) {
+export default function TaxpayerActions({ taxpayerId, clientName, archived = false, returnToList = false }: Props) {
   const router = useRouter()
   const [busy, setBusy] = useState<ClientAction | null>(null)
   const [showDelete, setShowDelete] = useState(false)
@@ -33,7 +34,8 @@ export default function TaxpayerActions({ taxpayerId, clientName, archived = fal
         setShowDelete(false)
         setConfirmation('')
       }
-      router.refresh()
+      if (returnToList) router.push('/taxpayers')
+      else router.refresh()
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : 'The client action could not be completed')
     } finally {
