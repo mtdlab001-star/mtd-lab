@@ -7,6 +7,7 @@ import { mergeMtdIncomeSources } from '@/lib/mtd-income-sources-server'
 import { quarterlyPeriodIsAvailable } from '@/lib/quarterly-submission-eligibility'
 import { taxYearHasEnded } from '@/lib/year-end-finalisation'
 import { currentWorkspace } from '@/lib/workspace'
+import ClientDetails from './ClientDetails'
 
 export const dynamic = 'force-dynamic'
 
@@ -172,6 +173,7 @@ export default async function TaxpayerPage({ params, searchParams }: { params: P
 
   return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="overview" sourceTypes={sourceTypes}/><main className="main">
     <div className="top"><div><h1 className="pageTitle">{taxpayer.display_name}</h1><p className="muted">Client summary and next steps</p></div><span className={connectionStatus.badgeClass}>{connectionStatus.label}</span></div>
+    <ClientDetails taxpayerId={id} displayName={taxpayer.display_name||id} nino={taxpayer.nino||''} mtditid={taxpayer.mtditid||''} archived={Boolean(taxpayer.archived_at)}/>
     <section className="panel journeyPanel" aria-labelledby="next-step-title">
       <div className="sectionHead"><div><span className="eyebrow">Guided journey</span><h2 id="next-step-title">What to do next</h2><p className="muted">Complete these steps in order. MTD Lab keeps the HMRC checks and audit trail in the background.</p></div></div>
       <div className="journeyGrid">
