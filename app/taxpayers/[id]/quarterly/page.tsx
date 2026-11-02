@@ -23,6 +23,13 @@ function taxYearFor(value?:string|null){
   const start=m>4||(m===4&&d>=6)?y:y-1
   return `${start}/${String(start+1).slice(-2)}`
 }
+function yearEndReliefAvailable(periodEnd?:string|null){
+  if(!periodEnd)return false
+  const [year,month,day]=periodEnd.split('-').map(Number)
+  const finalUpdate=(month===4&&day===5)||(month===3&&day===31)
+  const taxYearEndYear=month===3?year:year
+  return finalUpdate&&Date.now()>new Date(`${taxYearEndYear}-04-05T23:59:59Z`).getTime()
+}
 function visualStatus(o:any,submission?:any){
   const hmrc=String(o.status||'').toLowerCase()
   if(hmrc==='fulfilled')return {label:'Fulfilled',cls:'statusDone',accepted:true}
@@ -76,7 +83,6 @@ function cumulative(records:any[],businessId:string,periodEnd:string,type:string
       ['professionalFees',['professional','legal','management','account']],
       ['costOfServices',['service','cleaning','gardening']],
       ['travelCosts',['travel','mileage','vehicle']],
-      ['rentARoomRelief',['rent a room relief']],
       ['residentialFinancialCost',['residential financial cost']],
       ['carryForwardResidentialFinanceCost',['carried forward','carry forward residential']]
     ] as const
@@ -162,6 +168,7 @@ export default async function QuarterlyPage({params,searchParams}:{params:Promis
   const quarterRows=rows.map((o:any,index:number)=>({o,quarter:index+1,submission:latestSubmission(o.period_end)}))
   const acceptedPending=quarterRows.filter((x:any)=>String(x.o.status).toLowerCase()!=='fulfilled'&&x.submission?.status==='submitted').length
   const totals:any=selectedObligation?cumulative(digitalRecords||[],selectedBusiness,selectedObligation.period_end,sourceType):null
+  const canClaimYearEndRelief=sourceType==='uk-property'&&yearEndReliefAvailable(selectedObligation?.period_end)
   const yearLabel=rows[0]?.period_start?taxYearFor(rows[0].period_start):''
   const yearStart=yearLabel?yearLabel.split('/')[0]:''
   const annualDue=yearStart?`31/01/${Number(yearStart)+2}`:'After tax year end'
@@ -225,7 +232,7 @@ export default async function QuarterlyPage({params,searchParams}:{params:Promis
             <h3>UK property income</h3>
             <div className="two"><MoneyField name="rents" label="Total rent" value={totals.rents} hint="Do not include ground rents, rent charges or Rent a Room income here."/><MoneyField name="leasePremiums" label="Premiums for grant of a lease" value={totals.leasePremiums}/></div>
             <div className="two"><MoneyField name="reversePremiums" label="Reverse premiums and inducements" value={totals.reversePremiums}/><MoneyField name="otherIncome" label="Other income from property" value={totals.otherIncome} hint="For example, ground rents, rent charges or income from use of land."/></div>
-            <div className="two"><MoneyField name="ukTaxDeducted" label="Tax deducted from rental income" value={totals.ukTaxDeducted} hint="Enter tax already deducted from the rental income, if applicable."/><MoneyField name="rentARoomReceived" label="Rent a Room income received" value={totals.rentARoomReceived} hint="Keep this separate from total rent."/></div>
+            <MoneyField name="rentARoomReceived" label="Rent a Room income received" value={totals.rentARoomReceived} hint="Keep this separate from total rent. This is income, not the Rent a Room relief claim."/>
             <h3>UK property expenses</h3>
             <p className="muted">Use the detailed HMRC expense categories below. Do not include capital expenditure or repayment of mortgage capital.</p>
             <div className="two">
@@ -241,9 +248,11 @@ export default async function QuarterlyPage({params,searchParams}:{params:Promis
                 <MoneyField name="otherExpenses" label="Other allowable property expenses" value={totals.otherExpenses} allowNegative/>
                 <MoneyField name="residentialFinancialCost" label="Residential property finance costs" value={totals.residentialFinancialCost} hint="Enter eligible interest and finance charges for residential property, not capital repayment."/>
                 <MoneyField name="carryForwardResidentialFinanceCost" label="Residential finance costs brought forward" value={totals.carryForwardResidentialFinanceCost} hint="Unused residential finance costs carried forward from an earlier tax year."/>
-                <MoneyField name="rentARoomRelief" label="Rent a Room amount claimed" value={totals.rentARoomRelief} hint="Enter only the amount being claimed. Rent a Room income belongs in the income section above."/>
               </div>
             </div>
+            <h3>Tax deducted and year-end relief</h3>
+            <MoneyField name="ukTaxDeducted" label="Tax already deducted from rental income" value={totals.ukTaxDeducted} hint="This is tax paid at source. It does not reduce rental income or the indicative property profit."/>
+            {canClaimYearEndRelief?<MoneyField name="rentARoomRelief" label="Rent a Room relief claimed at year end" value={0} hint="This is a relief, not a running expense. Do not claim ordinary property expenses when using Rent a Room relief."/>:<div className="status"><strong>Rent a Room relief is not a quarterly expense.</strong><div>Record Rent a Room income above. The relief claim becomes available with the final cumulative update after the tax year has ended.</div></div>}
           </>:<>
             <h3>Business income</h3>
             <div className="two"><MoneyField name="turnover" label="Turnover / income" value={totals.turnover} required/><MoneyField name="otherIncome" label="Other business income" value={totals.otherIncome}/></div>
