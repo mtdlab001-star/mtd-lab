@@ -18,6 +18,8 @@ export function buildSelfEmploymentCumulativePayload(p:any){
 }
 
 export function buildUkPropertyCumulativePayload(p:any){
+  // Property Business API v6.0: detailed expenses are sent without consolidatedExpenses.
+  // HMRC rejects a request that supplies both expense methods.
   return {fromDate:p.periodStart,toDate:p.periodEnd,ukProperty:{income:{premiumsOfLeaseGrant:n(p.leasePremiums),reversePremiums:n(p.reversePremiums),periodAmount:n(p.rentalIncome??p.rents),taxDeducted:n(p.ukTaxDeducted),otherIncome:n(p.otherPropertyIncome??p.otherIncome),rentARoom:{rentsReceived:n(p.rentARoomReceived)}},expenses:{premisesRunningCosts:n(p.premisesRunningCosts??p.premisesCosts),repairsAndMaintenance:n(p.repairsMaintenance),financialCosts:n(p.financialCosts),professionalFees:n(p.professionalFees),costOfServices:n(p.costOfServices),other:n(p.otherCosts??p.otherExpenses),residentialFinancialCost:n(p.residentialFinancialCost),travelCosts:n(p.travelCosts),residentialFinancialCostsCarriedForward:n(p.carryForwardResidentialFinanceCost),rentARoom:{amountClaimed:n(p.rentARoomRelief)}}}}
 }
 

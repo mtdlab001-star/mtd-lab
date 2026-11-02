@@ -123,8 +123,8 @@ function cumulative(records:any[],businessId:string,periodEnd:string,type:string
   return result
 }
 
-function MoneyField({name,label,value,required=false}:{name:string,label:string,value:number,required?:boolean}){
-  return <div><label>{label} (£)</label><input className="field" name={name} type="number" min="0" step="0.01" required={required} defaultValue={Number(value||0).toFixed(2)}/></div>
+function MoneyField({name,label,value,required=false,allowNegative=false,hint}:{name:string,label:string,value:number,required?:boolean,allowNegative?:boolean,hint?:string}){
+  return <div><label htmlFor={name}>{label} (£)</label><input id={name} className="field" name={name} type="number" min={allowNegative?'-99999999999.99':'0'} max="99999999999.99" step="0.01" required={required} defaultValue={Number(value||0).toFixed(2)}/>{hint&&<p className="muted" style={{margin:'6px 0 12px',fontSize:13}}>{hint}</p>}</div>
 }
 
 export default async function QuarterlyPage({params,searchParams}:{params:Promise<{id:string}>,searchParams:Promise<Record<string,string|undefined>>}){
@@ -221,25 +221,27 @@ export default async function QuarterlyPage({params,searchParams}:{params:Promis
               </div>
             </div>
           </>:sourceType==='uk-property'?<>
+            <div className="status" style={{marginBottom:18}}><strong>Enter cumulative totals for this tax year.</strong><div>Include income and expenses from {fmtDate(selectedObligation.period_start)} to {fmtDate(selectedObligation.period_end)}, not only the latest quarter. Use minus amounts only to correct expenses reported earlier in the same cumulative period.</div></div>
             <h3>UK property income</h3>
-            <div className="two"><MoneyField name="rents" label="Total rent" value={totals.rents}/><MoneyField name="leasePremiums" label="Premiums for grant of a lease" value={totals.leasePremiums}/></div>
-            <div className="two"><MoneyField name="reversePremiums" label="Reverse premiums and inducements" value={totals.reversePremiums}/><MoneyField name="otherIncome" label="Other property income" value={totals.otherIncome}/></div>
-            <div className="two"><MoneyField name="ukTaxDeducted" label="UK tax deducted" value={totals.ukTaxDeducted}/><MoneyField name="rentARoomReceived" label="Rent a Room received" value={totals.rentARoomReceived}/></div>
-            <h3>Allowable expenses</h3>
+            <div className="two"><MoneyField name="rents" label="Total rent" value={totals.rents} hint="Do not include ground rents, rent charges or Rent a Room income here."/><MoneyField name="leasePremiums" label="Premiums for grant of a lease" value={totals.leasePremiums}/></div>
+            <div className="two"><MoneyField name="reversePremiums" label="Reverse premiums and inducements" value={totals.reversePremiums}/><MoneyField name="otherIncome" label="Other income from property" value={totals.otherIncome} hint="For example, ground rents, rent charges or income from use of land."/></div>
+            <div className="two"><MoneyField name="ukTaxDeducted" label="Tax deducted from rental income" value={totals.ukTaxDeducted} hint="Enter tax already deducted from the rental income, if applicable."/><MoneyField name="rentARoomReceived" label="Rent a Room income received" value={totals.rentARoomReceived} hint="Keep this separate from total rent."/></div>
+            <h3>UK property expenses</h3>
+            <p className="muted">Use the detailed HMRC expense categories below. Do not include capital expenditure or repayment of mortgage capital.</p>
             <div className="two">
               <div>
-                <MoneyField name="premisesCosts" label="Rent, rates, insurance and ground rents" value={totals.premisesCosts}/>
-                <MoneyField name="repairsMaintenance" label="Property repairs and maintenance" value={totals.repairsMaintenance}/>
-                <MoneyField name="financialCosts" label="Property finance costs" value={totals.financialCosts}/>
-                <MoneyField name="professionalFees" label="Legal, management and professional fees" value={totals.professionalFees}/>
-                <MoneyField name="costOfServices" label="Costs of services provided" value={totals.costOfServices}/>
+                <MoneyField name="premisesCosts" label="Rent, rates, insurance and ground rents" value={totals.premisesCosts} allowNegative/>
+                <MoneyField name="repairsMaintenance" label="Property repairs and maintenance" value={totals.repairsMaintenance} allowNegative/>
+                <MoneyField name="financialCosts" label="Non-residential property finance costs" value={totals.financialCosts} allowNegative hint="Loan interest and other finance costs for non-residential property. Do not include mortgage capital repayments."/>
+                <MoneyField name="professionalFees" label="Legal, management and other professional fees" value={totals.professionalFees} allowNegative/>
+                <MoneyField name="costOfServices" label="Costs of services provided, including wages" value={totals.costOfServices} allowNegative/>
               </div>
               <div>
-                <MoneyField name="travelCosts" label="Travel expenses" value={totals.travelCosts}/>
-                <MoneyField name="otherExpenses" label="Other allowable property expenses" value={totals.otherExpenses}/>
-                <MoneyField name="rentARoomRelief" label="Rent a Room relief" value={totals.rentARoomRelief}/>
-                <MoneyField name="residentialFinancialCost" label="Residential financial cost" value={totals.residentialFinancialCost}/>
-                <MoneyField name="carryForwardResidentialFinanceCost" label="Residential finance cost carried forward" value={totals.carryForwardResidentialFinanceCost}/>
+                <MoneyField name="travelCosts" label="Travel expenses" value={totals.travelCosts} allowNegative/>
+                <MoneyField name="otherExpenses" label="Other allowable property expenses" value={totals.otherExpenses} allowNegative/>
+                <MoneyField name="residentialFinancialCost" label="Residential property finance costs" value={totals.residentialFinancialCost} hint="Enter eligible interest and finance charges for residential property, not capital repayment."/>
+                <MoneyField name="carryForwardResidentialFinanceCost" label="Residential finance costs brought forward" value={totals.carryForwardResidentialFinanceCost} hint="Unused residential finance costs carried forward from an earlier tax year."/>
+                <MoneyField name="rentARoomRelief" label="Rent a Room amount claimed" value={totals.rentARoomRelief} hint="Enter only the amount being claimed. Rent a Room income belongs in the income section above."/>
               </div>
             </div>
           </>:<>
