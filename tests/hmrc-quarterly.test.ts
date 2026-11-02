@@ -1,6 +1,18 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { buildForeignPropertyCumulativePayload } from '../lib/hmrc-quarterly.ts'
+import { buildForeignPropertyCumulativePayload, buildUkPropertyCumulativePayload } from '../lib/hmrc-quarterly.ts'
+
+test('UK property payload follows HMRC v6 detailed cumulative schema',()=>{
+  const payload=buildUkPropertyCumulativePayload({
+    periodStart:'2026-04-06',periodEnd:'2026-10-05',rents:1200,leasePremiums:20,reversePremiums:10,otherIncome:30,ukTaxDeducted:40,rentARoomReceived:50,
+    premisesCosts:250,repairsMaintenance:-25,financialCosts:60,professionalFees:70,costOfServices:80,otherExpenses:90,residentialFinancialCost:100,travelCosts:110,carryForwardResidentialFinanceCost:120,rentARoomRelief:130
+  })
+  assert.deepEqual(payload,{fromDate:'2026-04-06',toDate:'2026-10-05',ukProperty:{
+    income:{premiumsOfLeaseGrant:20,reversePremiums:10,periodAmount:1200,taxDeducted:40,otherIncome:30,rentARoom:{rentsReceived:50}},
+    expenses:{premisesRunningCosts:250,repairsAndMaintenance:-25,financialCosts:60,professionalFees:70,costOfServices:80,other:90,residentialFinancialCost:100,travelCosts:110,residentialFinancialCostsCarriedForward:120,rentARoom:{amountClaimed:130}}
+  }})
+  assert.equal('consolidatedExpenses' in payload.ukProperty.expenses,false)
+})
 
 test('foreign property payload uses country code for 2025 to 2026 cumulative submissions',()=>{
   const payload=buildForeignPropertyCumulativePayload({

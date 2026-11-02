@@ -10,6 +10,13 @@ function money(value: FormDataEntryValue | null) {
   return Number.isFinite(n) ? Math.round(n*100)/100 : 0
 }
 
+function validHmrcAmount(value: FormDataEntryValue | null,allowNegative=false){
+  const raw=String(value??'').trim()
+  if(!/^-?\d+(?:\.\d{1,2})?$/.test(raw))return false
+  const amount=Number(raw)
+  return Number.isFinite(amount)&&amount<=99999999999.99&&amount>=(allowNegative?-99999999999.99:0)
+}
+
 const moneyFields=[
  'turnover','otherIncome','taxTakenOff','costOfGoods','cisPayments','staffCosts','travelCosts','premisesCosts','repairsMaintenance','officeCosts','advertisingCosts','businessEntertainment','interestLoans','financialCharges','badDebts','professionalFees','depreciation','otherExpenses',
  'costOfGoodsDisallowable','cisPaymentsDisallowable','staffCostsDisallowable','travelCostsDisallowable','premisesCostsDisallowable','repairsMaintenanceDisallowable','officeCostsDisallowable','advertisingCostsDisallowable','businessEntertainmentDisallowable','interestLoansDisallowable','financialChargesDisallowable','badDebtsDisallowable','professionalFeesDisallowable','depreciationDisallowable','otherExpensesDisallowable',
@@ -57,6 +64,16 @@ export async function POST(req: Request) {
     periodStart,
     periodEnd,
     preparedAt:new Date().toISOString()
+  }
+  if(eligibility.sourceType==='uk-property'){
+    const signedExpenseFields=new Set(['premisesCosts','repairsMaintenance','financialCosts','professionalFees','costOfServices','travelCosts','otherExpenses'])
+    const ukPropertyFields=['rents','leasePremiums','reversePremiums','otherIncome','ukTaxDeducted','rentARoomReceived','premisesCosts','repairsMaintenance','financialCosts','professionalFees','costOfServices','travelCosts','otherExpenses','residentialFinancialCost','carryForwardResidentialFinanceCost','rentARoomRelief']
+    const invalid=ukPropertyFields.find(key=>!validHmrcAmount(form.get(key),signedExpenseFields.has(key)))
+    if(invalid){
+      back.searchParams.set('periodEnd',periodEnd)
+      back.searchParams.set('error','Enter each UK property amount in HMRC format, using no more than 2 decimal places and no more than £99,999,999,999.99')
+      return NextResponse.redirect(back,303)
+    }
   }
   for(const key of moneyFields) payload[key]=money(form.get(key))
 
