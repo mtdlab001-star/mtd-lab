@@ -17,10 +17,16 @@ function validHmrcAmount(value: FormDataEntryValue | null,allowNegative=false){
   return Number.isFinite(amount)&&amount<=99999999999.99&&amount>=(allowNegative?-99999999999.99:0)
 }
 
+function yearEndReliefAvailable(periodEnd:string){
+  const [year,month,day]=periodEnd.split('-').map(Number)
+  const finalUpdate=(month===4&&day===5)||(month===3&&day===31)
+  return finalUpdate&&Date.now()>new Date(`${year}-04-05T23:59:59Z`).getTime()
+}
+
 const moneyFields=[
  'turnover','otherIncome','taxTakenOff','costOfGoods','cisPayments','staffCosts','travelCosts','premisesCosts','repairsMaintenance','officeCosts','advertisingCosts','businessEntertainment','interestLoans','financialCharges','badDebts','professionalFees','depreciation','otherExpenses',
  'costOfGoodsDisallowable','cisPaymentsDisallowable','staffCostsDisallowable','travelCostsDisallowable','premisesCostsDisallowable','repairsMaintenanceDisallowable','officeCostsDisallowable','advertisingCostsDisallowable','businessEntertainmentDisallowable','interestLoansDisallowable','financialChargesDisallowable','badDebtsDisallowable','professionalFeesDisallowable','depreciationDisallowable','otherExpensesDisallowable',
- 'rentalIncome','rents','leasePremiums','reversePremiums','otherPropertyIncome','ukTaxDeducted','rentARoomReceived','premisesRunningCosts','financialCosts','costOfServices','otherCosts','rentARoomRelief','residentialFinancialCost','carryForwardResidentialFinanceCost','propertyExpenses'
+ 'rentalIncome','rents','leasePremiums','reversePremiums','otherPropertyIncome','ukTaxDeducted','rentARoomReceived','premisesRunningCosts','financialCosts','costOfServices','otherCosts','residentialFinancialCost','carryForwardResidentialFinanceCost','propertyExpenses'
 ]
 
 const allowedIncomeSourceTypes=new Set(['self-employment','uk-property','foreign-property'])
@@ -67,7 +73,7 @@ export async function POST(req: Request) {
   }
   if(eligibility.sourceType==='uk-property'){
     const signedExpenseFields=new Set(['premisesCosts','repairsMaintenance','financialCosts','professionalFees','costOfServices','travelCosts','otherExpenses'])
-    const ukPropertyFields=['rents','leasePremiums','reversePremiums','otherIncome','ukTaxDeducted','rentARoomReceived','premisesCosts','repairsMaintenance','financialCosts','professionalFees','costOfServices','travelCosts','otherExpenses','residentialFinancialCost','carryForwardResidentialFinanceCost','rentARoomRelief']
+    const ukPropertyFields=['rents','leasePremiums','reversePremiums','otherIncome','ukTaxDeducted','rentARoomReceived','premisesCosts','repairsMaintenance','financialCosts','professionalFees','costOfServices','travelCosts','otherExpenses','residentialFinancialCost','carryForwardResidentialFinanceCost']
     const invalid=ukPropertyFields.find(key=>!validHmrcAmount(form.get(key),signedExpenseFields.has(key)))
     if(invalid){
       back.searchParams.set('periodEnd',periodEnd)
@@ -76,6 +82,21 @@ export async function POST(req: Request) {
     }
   }
   for(const key of moneyFields) payload[key]=money(form.get(key))
+  if(eligibility.sourceType==='uk-property'&&form.has('rentARoomRelief')){
+    if(!validHmrcAmount(form.get('rentARoomRelief'))||!yearEndReliefAvailable(periodEnd)){
+      back.searchParams.set('periodEnd',periodEnd)
+      back.searchParams.set('error','Rent a Room relief can be claimed only with the final cumulative update after the tax year has ended')
+      return NextResponse.redirect(back,303)
+    }
+    const relief=money(form.get('rentARoomRelief'))
+    const ordinaryExpenseFields=['premisesCosts','repairsMaintenance','financialCosts','professionalFees','costOfServices','travelCosts','otherExpenses','residentialFinancialCost','carryForwardResidentialFinanceCost']
+    if(relief>0&&ordinaryExpenseFields.some(key=>money(form.get(key))!==0)){
+      back.searchParams.set('periodEnd',periodEnd)
+      back.searchParams.set('error','Rent a Room relief cannot be claimed together with ordinary UK property expenses. Remove the expenses or leave the relief blank')
+      return NextResponse.redirect(back,303)
+    }
+    payload.rentARoomRelief=relief
+  }
 
   const now=new Date().toISOString()
   const {error:draftError}=await db.from('hmrc_quarterly_drafts').upsert({

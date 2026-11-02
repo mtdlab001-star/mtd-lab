@@ -3,10 +3,10 @@ import ExcelJS from 'exceljs'
 
 const purple='572060'
 
-function styleSheet(ws:ExcelJS.Worksheet){
+function styleSheet(ws:ExcelJS.Worksheet,sectionRows=[2,8,11]){
  ws.columns=[{width:48},{width:20},{width:24}]
  ws.getRow(1).font={bold:true,size:14,color:{argb:purple}}
- for(const row of [2,8,11]){
+ for(const row of sectionRows){
   const r=ws.getRow(row);r.font={bold:true,color:{argb:'FFFFFF'}};r.fill={type:'pattern',pattern:'solid',fgColor:{argb:purple}}
  }
  ws.eachRow(r=>{r.alignment={vertical:'middle'};r.height=22})
@@ -25,9 +25,11 @@ function selfEmployment(){
 function property(){
  const wb=new ExcelJS.Workbook();const ws=wb.addWorksheet('UK Property')
  const rows:any[][]=[
-  ['Income'],['Account Name','Total Amount (£)'],['Rental Income',0],['Premiums of Lease Grant',0],['Reverse Premiums',0],['Other Property Income',0],['UK Tax Deducted',0],['Rent a Room Received',0],['Total Income ',{formula:'SUM(B3:B6,B8)-B7'}],['Expenses'],['Account Name','Total Amount (£)'],['Premises Running Costs',0],['Repairs and Maintenance',0],['Financial Costs',0],['Professional Fees',0],['Travel Costs',0],['Cost of Services',0],['Other Costs',0],['Rent a Room Relief',0],['Total Expenses ',{formula:'SUM(B12:B19)'}],['Net Profit/Loss',{formula:'B9-B20'}],['Residential Financial Cost',0],['Carry Forward Residential Finance Cost',0]
+  ['UK property income'],['Account Name','Total Amount (£)'],['Total Rent',0],['Premiums for Grant of a Lease',0],['Reverse Premiums and Inducements',0],['Other Income from Property',0],['Rent a Room Income Received',0],['Total Income',{formula:'SUM(B3:B7)'}],
+  ['UK property expenses'],['Account Name','Total Amount (£)'],['Rent, Rates, Insurance and Ground Rents',0],['Property Repairs and Maintenance',0],['Non-residential Property Finance Costs',0],['Legal, Management and Other Professional Fees',0],['Costs of Services Provided, Including Wages',0],['Travel Expenses',0],['Other Allowable Property Expenses',0],['Residential Property Finance Costs',0],['Residential Finance Costs Brought Forward',0],['Total Running Expenses',{formula:'SUM(B11:B19)'}],['Indicative Property Profit',{formula:'B8-B20'}],
+  ['Tax deducted and year-end relief'],['Account Name','Total Amount (£)'],['Tax Already Deducted from Rental Income',0],['Rent a Room Relief Claimed at Year End',0]
  ]
- rows.forEach(r=>ws.addRow(r));styleSheet(ws);return wb
+ rows.forEach(r=>ws.addRow(r));styleSheet(ws,[2,10,23]);ws.getCell('C25').value='Complete only for the final cumulative update after the tax year has ended.';return wb
 }
 
 function foreignProperty(){

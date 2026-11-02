@@ -14,6 +14,12 @@ test('UK property payload follows HMRC v6 detailed cumulative schema',()=>{
   assert.equal('consolidatedExpenses' in payload.ukProperty.expenses,false)
 })
 
+test('UK property payload omits a Rent a Room claim from ordinary cumulative updates',()=>{
+  const payload=buildUkPropertyCumulativePayload({periodStart:'2026-04-06',periodEnd:'2026-10-05',rents:1200})
+  assert.equal('rentARoom' in payload.ukProperty.expenses,false)
+  assert.equal(payload.ukProperty.income.taxDeducted,0)
+})
+
 test('foreign property payload uses country code for 2025 to 2026 cumulative submissions',()=>{
   const payload=buildForeignPropertyCumulativePayload({
     periodStart:'2026-04-06',

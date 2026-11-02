@@ -36,8 +36,11 @@ test('calculates property totals from the property payload',()=>{
 })
 
 test('calculates UK property totals from the accepted cumulative payload',()=>{
- const property={request_payload:{incomeSourceType:'uk-property',payload:{ukProperty:{income:{premiumsOfLeaseGrant:0,reversePremiums:0,periodAmount:1000,taxDeducted:0,otherIncome:100,rentARoom:{rentsReceived:0}},expenses:{premisesRunningCosts:100,repairsAndMaintenance:0,financialCosts:0,professionalFees:150,costOfServices:0,other:350,residentialFinancialCost:0,travelCosts:0,residentialFinancialCostsCarriedForward:0,rentARoom:{amountClaimed:0}}}}}}
+ const property={request_payload:{incomeSourceType:'uk-property',payload:{ukProperty:{income:{premiumsOfLeaseGrant:0,reversePremiums:0,periodAmount:1000,taxDeducted:200,otherIncome:100,rentARoom:{rentsReceived:0}},expenses:{premisesRunningCosts:100,repairsAndMaintenance:0,financialCosts:0,professionalFees:150,costOfServices:0,other:350,residentialFinancialCost:0,travelCosts:0,residentialFinancialCostsCarriedForward:0,rentARoom:{amountClaimed:750}}}}}}
  assert.deepEqual(quarterlyFinancials(property),{income:1100,expenses:600,net:500})
+ const detail=quarterlyEvidenceDetail(property,'UK Property')
+ assert.match(detail,/Tax already deducted £200\.00/)
+ assert.match(detail,/Rent a Room relief £750\.00/)
 })
 
 test('calculates foreign property totals from its array and nested rent amount',()=>{
