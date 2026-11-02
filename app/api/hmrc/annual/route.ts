@@ -10,6 +10,7 @@ import { hmrcApiBase } from '@/lib/hmrc'
 import { hmrcAcceptHeader } from '@/lib/hmrc-api-versions'
 import { taxYearHasEnded } from '@/lib/year-end-finalisation'
 import { annualCompatibilityPatch, annualEndpoint, assertSandboxFeature, mergeAnnualCompatibility } from '@/lib/hmrc-compatibility'
+import { productionSubmissionBlocker } from '@/lib/hmrc-production'
 
 export async function POST(req: Request) {
   if (!isSameOriginRequest(req)) return new NextResponse('Invalid request origin', { status: 403 })
@@ -55,7 +56,8 @@ export async function POST(req: Request) {
     const section = source.sourceType === 'uk-property' ? patch?.ukProperty : patch
     patch = annualCompatibilityPatch(source.sourceType, taxYear, section?.adjustments?.adjustmentToProfitsForClass4, section?.allowances?.firstYearAllowanceOnPlantAndMachinery)
     if (!taxYearHasEnded(taxYear)) throw new Error('Annual submissions remain locked until the selected tax year has ended.')
-    if (process.env.HMRC_ENVIRONMENT === 'production' && process.env.HMRC_ALLOW_PRODUCTION_SUBMISSIONS !== 'true') throw new Error('Production HMRC submissions remain locked until explicitly enabled.')
+    const productionBlocker = productionSubmissionBlocker()
+    if (productionBlocker) throw new Error(productionBlocker)
     assertSandboxFeature('Plant and machinery first year allowance', section?.allowances?.firstYearAllowanceOnPlantAndMachinery !== undefined)
     if (form.get('annualConfirmed') !== 'yes') throw new Error('Confirm the reviewed annual changes before submitting.')
     const fraud = buildFraudHeaders(req, form, taxpayerId)

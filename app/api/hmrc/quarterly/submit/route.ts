@@ -11,6 +11,7 @@ import { isSameOriginRequest } from '@/lib/request-security'
 import { buildSelfEmploymentCumulativePayload,buildUkPropertyCumulativePayload,buildForeignPropertyCumulativePayload,cumulativeEndpoint,ukPropertyCumulativeEndpoint,foreignPropertyCumulativeEndpoint,taxYearFromDate } from '@/lib/hmrc-quarterly'
 import { quarterlySubmissionEligibility } from '@/lib/quarterly-submission-eligibility'
 import { currentWorkspace } from '@/lib/workspace'
+import { productionSubmissionBlocker } from '@/lib/hmrc-production'
 
 function firstValue(obj:any,keys:string[]){for(const key of keys){const value=obj?.[key];if(value!==undefined&&value!==null&&value!=='')return value}return null}
 function flattenObligations(payload:any){const groups=Array.isArray(payload?.obligations)?payload.obligations:[];return groups.flatMap((group:any)=>(group.obligationDetails||[]).map((o:any)=>({...o,businessId:group.identification||group.businessId||group.incomeSourceId||null})))}
@@ -32,15 +33,17 @@ export async function POST(req:Request){
  if(!p.businessId){back.searchParams.set('error','Select a valid HMRC business before submission');return NextResponse.redirect(back,303)}
  if(!p.periodStart||!p.periodEnd||p.periodStart>'9999-12-31'||p.periodEnd<p.periodStart){back.searchParams.set('error','The cumulative submission period is invalid');return NextResponse.redirect(back,303)}
  if(p.periodStart<'2025-04-06'){back.searchParams.set('error','Cumulative quarterly submission requires tax year 2025/26 or later');return NextResponse.redirect(back,303)}
- if(process.env.HMRC_ENVIRONMENT==='production'&&process.env.HMRC_ALLOW_PRODUCTION_SUBMISSIONS!=='true'){back.searchParams.set('error','Production HMRC submissions are locked. Complete sandbox testing and explicitly enable production submissions first.');return NextResponse.redirect(back,303)}
+ const productionBlocker=productionSubmissionBlocker();if(productionBlocker){back.searchParams.set('error',productionBlocker);return NextResponse.redirect(back,303)}
  const db=supabaseAdmin();const requestedType=String(p.incomeSourceType||p.filingType||'self-employment');const [taxpayerResult,businessResult,obligationResult,submissionResult]=await Promise.all([
-  db.from('taxpayers').select('nino').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle(),
+  db.from('taxpayers').select('nino,mtd_signup_status,mtd_exemption_status').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle(),
   db.from('hmrc_businesses').select('business_id,business_type,raw').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).eq('business_id',p.businessId).maybeSingle(),
   db.from('hmrc_obligations').select('taxpayer_id,business_id,period_start,period_end,status').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).eq('period_start',p.periodStart).eq('period_end',p.periodEnd),
   db.from('hmrc_quarterly_submissions').select('taxpayer_id,business_id,period_start,period_end,status').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).eq('business_id',p.businessId).eq('period_start',p.periodStart).eq('period_end',p.periodEnd).in('status',['sending','submitted'])
  ]);const taxpayer=taxpayerResult.data;if(taxpayerResult.error||!taxpayer?.nino){back.searchParams.set('error','HMRC taxpayer record is missing, inaccessible, or has no NINO');return NextResponse.redirect(back,303)}
+ if(process.env.HMRC_ENVIRONMENT==='production'&&taxpayer.mtd_exemption_status==='approved'){back.searchParams.set('error','This client has an approved MTD exemption and must not be filed through MTD.');return NextResponse.redirect(back,303)}
+ if(process.env.HMRC_ENVIRONMENT==='production'&&taxpayer.mtd_signup_status!=='signed_up'){back.searchParams.set('error','Confirm that this client is signed up for MTD before production filing.');return NextResponse.redirect(back,303)}
  if(businessResult.error||obligationResult.error||submissionResult.error){back.searchParams.set('error','Quarterly submission checks are temporarily unavailable');return NextResponse.redirect(back,303)}
- const eligibility=quarterlySubmissionEligibility({taxpayerId,businessId:p.businessId,periodStart:p.periodStart,periodEnd:p.periodEnd,requestedType,business:businessResult.data,obligations:obligationResult.data,submissions:submissionResult.data});if(!eligibility.ok){back.searchParams.set('error',eligibility.error);return NextResponse.redirect(back,303)}
+ const eligibility=quarterlySubmissionEligibility({taxpayerId,businessId:p.businessId,periodStart:p.periodStart,periodEnd:p.periodEnd,requestedType,business:businessResult.data,obligations:obligationResult.data,submissions:submissionResult.data,allowEarlySubmission:String(form.get('earlySubmissionConfirmed')||'')==='yes'});if(!eligibility.ok){back.searchParams.set('error',eligibility.error);return NextResponse.redirect(back,303)}
  let actingAgentId:string|null=null;let accessToken:string;try{actingAgentId=await resolveConnectedAgentForPermission(taxpayerId,'can_submit_quarterly',requestedAgentId);accessToken=await getHmrcAccessTokenForActingCapacity(taxpayerId,actingAgentId)}catch(e:any){back.searchParams.set('error',e.message||'HMRC connection is incomplete');return NextResponse.redirect(back,303)}
  const fraud=buildFraudHeaders(req,form,taxpayerId);if(fraud.missing.length){back.searchParams.set('readiness','blocked');back.searchParams.set('missing',fraud.missing.join(','));return NextResponse.redirect(back,303)}
  const taxYear=taxYearFromDate(p.periodStart);const type=eligibility.sourceType;let requestPayload:any;let endpoint:string;let acceptHeader:string

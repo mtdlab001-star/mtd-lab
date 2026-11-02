@@ -8,6 +8,7 @@ import { isSameOriginRequest } from '@/lib/request-security'
 import { agentCan } from '@/lib/agent-authorisation'
 import { yearEndFinalisationStatus } from '@/lib/year-end-finalisation'
 import { currentWorkspace } from '@/lib/workspace'
+import { productionSubmissionBlocker } from '@/lib/hmrc-production'
 
 function taxYearPeriod(taxYear:string){const startYear=Number(taxYear.slice(0,4));return {from:`${startYear}-04-06`,to:`${startYear+1}-04-05`}}
 
@@ -19,8 +20,11 @@ export async function POST(req:Request){
  if(!/^20\d{2}-\d{2}$/.test(taxYear)){back.searchParams.set('error','Select a valid HMRC tax year');return NextResponse.redirect(back,303)}
  if(!calculationId){back.searchParams.set('error','HMRC calculation ID is missing');return NextResponse.redirect(back,303)}
  if(!declarationConfirmed){back.searchParams.set('error','Confirm the declaration before submitting the Income Tax return');return NextResponse.redirect(back,303)}
- const db=supabaseAdmin();const {data:taxpayer}=await db.from('taxpayers').select('nino').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle();if(!taxpayer?.nino){back.searchParams.set('error','Taxpayer is not available in this accounting workspace or has no NINO');return NextResponse.redirect(back,303)}
- if(actingAgentId){const allowed=await agentCan(taxpayerId,actingAgentId,'can_submit_final_declaration');if(!allowed){back.searchParams.set('error','The selected agent is not currently authorised to submit the Final Declaration for this taxpayer.');return NextResponse.redirect(back,303)}}
+ const productionBlocker=productionSubmissionBlocker();if(productionBlocker){back.searchParams.set('error',productionBlocker);return NextResponse.redirect(back,303)}
+ const db=supabaseAdmin();const {data:taxpayer}=await db.from('taxpayers').select('nino,mtd_signup_status,mtd_exemption_status').eq('id',taxpayerId).eq('firm_id',workspace.firmId).maybeSingle();if(!taxpayer?.nino){back.searchParams.set('error','Taxpayer is not available in this accounting workspace or has no NINO');return NextResponse.redirect(back,303)}
+ if(process.env.HMRC_ENVIRONMENT==='production'&&taxpayer.mtd_exemption_status==='approved'){back.searchParams.set('error','This client has an approved MTD exemption and must not be filed through MTD.');return NextResponse.redirect(back,303)}
+ if(process.env.HMRC_ENVIRONMENT==='production'&&taxpayer.mtd_signup_status!=='signed_up'){back.searchParams.set('error','Confirm that this client is signed up for MTD before production filing.');return NextResponse.redirect(back,303)}
+ if(actingAgentId){const allowed=await agentCan(taxpayerId,actingAgentId,'can_submit_final_declaration');if(!allowed){back.searchParams.set('error','The selected agent is not currently authorised to submit the Final Declaration for this taxpayer.');return NextResponse.redirect(back,303)}const {data:relationship}=await db.from('mtd_submission_audit').select('status,request_summary').eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId).eq('acting_agent_id',actingAgentId).eq('event_type','agent_relationship_check').order('created_at',{ascending:false}).limit(1).maybeSingle();if(relationship?.status!=='accepted'||relationship?.request_summary?.agentType!=='main'){back.searchParams.set('error','Only an agent with a current HMRC main-agent relationship check can submit the Final Declaration.');return NextResponse.redirect(back,303)}}
  const period=taxYearPeriod(taxYear)
  const [{count:businessCount},{data:obligations},{data:reviews}]=await Promise.all([
   db.from('hmrc_businesses').select('id',{count:'exact',head:true}).eq('firm_id',workspace.firmId).eq('taxpayer_id',taxpayerId),

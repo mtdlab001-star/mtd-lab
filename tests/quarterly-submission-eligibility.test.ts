@@ -22,7 +22,13 @@ test('allows a known business with a matching open obligation after the period h
 
 test('blocks submission on the period-end date until that day has fully ended',()=>{
   const result=quarterlySubmissionEligibility({...base,currentDate:'2026-10-05'})
-  assert.deepEqual(result,{ok:false,error:'This quarterly update cannot be submitted until the period ending 2026-10-05 has fully ended'})
+  assert.deepEqual(result,{ok:false,error:'This quarterly update can be sent only after the period ending 2026-10-05, or during the 10-day early window when no further transactions are expected'})
+})
+
+test('allows the 10-day early window only after explicit no-more-transactions confirmation',()=>{
+  assert.equal(quarterlySubmissionEligibility({...base,currentDate:'2026-09-25'}).ok,false)
+  assert.equal(quarterlySubmissionEligibility({...base,currentDate:'2026-09-25',allowEarlySubmission:true}).ok,true)
+  assert.equal(quarterlySubmissionEligibility({...base,currentDate:'2026-09-24',allowEarlySubmission:true}).ok,false)
 })
 
 test('blocks an already accepted quarterly period',()=>{
@@ -42,7 +48,7 @@ test('blocks periods without a matching open obligation',()=>{
 
 test('blocks submission before the cumulative period has ended',()=>{
   const result=quarterlySubmissionEligibility({...base,currentDate:'2026-08-30'})
-  assert.deepEqual(result,{ok:false,error:'This quarterly update cannot be submitted until the period ending 2026-10-05 has fully ended'})
+  assert.deepEqual(result,{ok:false,error:'This quarterly update can be sent only after the period ending 2026-10-05, or during the 10-day early window when no further transactions are expected'})
 })
 
 test('blocks an income source type that does not match the stored business',()=>{

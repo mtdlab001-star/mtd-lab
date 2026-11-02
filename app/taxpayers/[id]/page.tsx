@@ -173,7 +173,7 @@ export default async function TaxpayerPage({ params, searchParams }: { params: P
 
   return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="overview" sourceTypes={sourceTypes}/><main className="main">
     <div className="top"><div><h1 className="pageTitle">{taxpayer.display_name}</h1><p className="muted">Client summary and next steps</p></div><span className={connectionStatus.badgeClass}>{connectionStatus.label}</span></div>
-    <ClientDetails taxpayerId={id} displayName={taxpayer.display_name||id} nino={taxpayer.nino||''} mtditid={taxpayer.mtditid||''} archived={Boolean(taxpayer.archived_at)}/>
+    <ClientDetails taxpayerId={id} displayName={taxpayer.display_name||id} nino={taxpayer.nino||''} mtditid={taxpayer.mtditid||''} archived={Boolean(taxpayer.archived_at)} qualifyingIncome={taxpayer.qualifying_income===null||taxpayer.qualifying_income===undefined?null:Number(taxpayer.qualifying_income)} qualifyingIncomeTaxYear={taxpayer.qualifying_income_tax_year||''} mtdSignupStatus={taxpayer.mtd_signup_status||'not_checked'} mtdExemptionStatus={taxpayer.mtd_exemption_status||'not_assessed'} previousReturnSubmitted={taxpayer.previous_return_submitted===null||taxpayer.previous_return_submitted===undefined?null:Boolean(taxpayer.previous_return_submitted)}/>
     <section className="panel journeyPanel" aria-labelledby="next-step-title">
       <div className="sectionHead"><div><span className="eyebrow">Guided journey</span><h2 id="next-step-title">What to do next</h2><p className="muted">Complete these steps in order. MTD Lab keeps the HMRC checks and audit trail in the background.</p></div></div>
       <div className="journeyGrid">

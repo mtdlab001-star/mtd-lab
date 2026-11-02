@@ -185,6 +185,7 @@ export default async function QuarterlyPage({params,searchParams}:{params:Promis
         </div>
       </section>
 
+      <div className="status"><strong>2026-27 first-year rule:</strong> HMRC does not apply quarterly late-submission penalty points for this first mandatory year, but the deadlines still apply and all required updates must be completed before the final Income Tax return.</div>
       {acceptedPending>0&&<div className="status">{acceptedPending} quarterly update{acceptedPending===1?' has':'s have'} been accepted by HMRC but the corresponding obligation is still open. Use Retrieve Obligations to refresh HMRC status. The accepted submission remains recorded in Submission History.</div>}
       {qs.error&&<div className="status statusError"><strong>Quarterly submission is blocked.</strong><div>{qs.error}</div></div>}
 

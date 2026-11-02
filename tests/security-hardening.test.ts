@@ -275,3 +275,15 @@ test('sandbox agent creation uses the shared HMRC production guard',()=>{
   assert.match(source,/process\.env\.HMRC_ENVIRONMENT === 'production'/)
   assert.match(source,/create-test-user\/agents/)
 })
+
+test('production filing needs credential approval and final agent filing needs a main-agent check',()=>{
+  const finalRoute=readFileSync('app/api/hmrc/calculations/final-declaration/route.ts','utf8')
+  const quarterlyRoute=readFileSync('app/api/hmrc/quarterly/submit/route.ts','utf8')
+  const guard=readFileSync('lib/hmrc-production.ts','utf8')
+  assert.match(guard,/HMRC_PRODUCTION_CREDENTIALS_APPROVED/)
+  assert.match(finalRoute,/agent_relationship_check/)
+  assert.match(finalRoute,/agentType.*main/)
+  assert.match(quarterlyRoute,/earlySubmissionConfirmed/)
+  assert.match(finalRoute,/productionSubmissionBlocker/)
+  assert.match(quarterlyRoute,/productionSubmissionBlocker/)
+})

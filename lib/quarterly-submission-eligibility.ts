@@ -11,6 +11,7 @@ type EligibilityInput={
   submissions?:any[]|null
   currentDate?:string
   allowFuturePeriod?:boolean
+  allowEarlySubmission?:boolean
 }
 
 export type QuarterlyEligibility=
@@ -25,6 +26,13 @@ export function normaliseQuarterlySourceType(value:string):QuarterlySourceType|n
 
 export function quarterlyPeriodIsAvailable(periodEnd:string,currentDate=new Date().toISOString().slice(0,10)){
   return Boolean(periodEnd&&/^\d{4}-\d{2}-\d{2}$/.test(periodEnd)&&/^\d{4}-\d{2}-\d{2}$/.test(currentDate)&&periodEnd<currentDate)
+}
+
+export function quarterlyEarlySubmissionIsAvailable(periodEnd:string,currentDate=new Date().toISOString().slice(0,10)){
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(periodEnd)||!/^\d{4}-\d{2}-\d{2}$/.test(currentDate))return false
+  const end=Date.parse(`${periodEnd}T00:00:00Z`);const now=Date.parse(`${currentDate}T00:00:00Z`)
+  const days=(end-now)/86400000
+  return days>=0&&days<=10
 }
 
 function storedBusinessSourceType(business:any):QuarterlySourceType{
@@ -49,8 +57,10 @@ export function quarterlySubmissionEligibility(input:EligibilityInput):Quarterly
     return {ok:false,error:'The selected income source type does not match the HMRC business'}
   }
 
-  if(!input.allowFuturePeriod&&!quarterlyPeriodIsAvailable(input.periodEnd,input.currentDate)){
-    return {ok:false,error:`This quarterly update cannot be submitted until the period ending ${input.periodEnd} has fully ended`}
+  const ended=quarterlyPeriodIsAvailable(input.periodEnd,input.currentDate)
+  const early=input.allowEarlySubmission&&quarterlyEarlySubmissionIsAvailable(input.periodEnd,input.currentDate)
+  if(!input.allowFuturePeriod&&!ended&&!early){
+    return {ok:false,error:`This quarterly update can be sent only after the period ending ${input.periodEnd}, or during the 10-day early window when no further transactions are expected`}
   }
 
   const duplicate=submissions.some((s:any)=>{

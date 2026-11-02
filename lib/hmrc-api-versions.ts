@@ -3,7 +3,7 @@ export const HMRC_API_VERSIONS = {
   propertyBusiness: '6.0',
   businessDetails: '2.0',
   obligations: '3.0',
-  individualCalculations: '8.0',
+  individualCalculations: '9.0',
   reliefs: '3.0',
   bsas: '7.0',
   losses: '7.0',
@@ -35,6 +35,5 @@ export function hmrcOtherIncomeAcceptHeader(taxYear: string) {
 export function hmrcApiVersionSnapshot() {
   return Object.entries(HMRC_API_VERSIONS).map(([api, version]) => ({ api, version,
     ...(api === 'otherIncome' ? { sandboxCandidate: '3.0', sandboxCandidateEnabled: process.env.HMRC_ENVIRONMENT !== 'production' && process.env.HMRC_OTHER_INCOME_V3_ENABLED === 'true' } : {}),
-    ...(api === 'individualCalculations' ? { sandboxCandidate: '9.0', sandboxCandidateEnabled: false } : {}),
   }))
 }
