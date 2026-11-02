@@ -54,8 +54,8 @@ test('Winter Fuel Payment charge uses the exact HMRC path and distinguishes miss
   assert.equal(winterFuelPaymentCharge({ calculation: { taxCalculation: { incomeTax: { winterFuelPaymentCharge: 0 } } } }), 0)
   assert.equal(winterFuelPaymentCharge({ calculation: { taxCalculation: { incomeTax: { winterFuelPaymentCharge: 150 } } } }), 150)
 })
-test('registry includes all current integration families and keeps Calculations v8 selected', () => {
-  assert.equal(HMRC_API_VERSIONS.individualCalculations, '8.0')
+test('registry includes all current integration families and keeps Calculations v9 selected', () => {
+  assert.equal(HMRC_API_VERSIONS.individualCalculations, '9.0')
   assert.equal(HMRC_API_VERSIONS.reliefs, '3.0')
   assert.equal(HMRC_API_VERSIONS.bsas, '7.0')
   assert.equal(HMRC_API_VERSIONS.testSupport, '1.0')
@@ -106,6 +106,7 @@ async function annualRequest(options: { action?: string; environment?: string; e
     '@/lib/hmrc-api-versions': { hmrcAcceptHeader: () => 'application/vnd.hmrc.5.0+json' },
     '@/lib/year-end-finalisation': { taxYearHasEnded: () => options.ended !== false },
     '@/lib/hmrc-compatibility': { annualCompatibilityPatch, annualEndpoint, mergeAnnualCompatibility, assertSandboxFeature: (feature: string, supplied: boolean) => assertSandboxFeature(feature, supplied, options.environment || 'sandbox') },
+    '@/lib/hmrc-production': { productionSubmissionBlocker: () => options.environment === 'production' ? 'Production filing is locked.' : null },
   }
   const exports: any = {}
   vm.runInNewContext(routeCode, { exports, require: (id: string) => { if (!modules[id]) throw new Error(`Unexpected dependency ${id}`); return modules[id] }, URL, Date, process: { env: { HMRC_ENVIRONMENT: options.environment || 'sandbox', HMRC_ALLOW_PRODUCTION_SUBMISSIONS: 'false' } },

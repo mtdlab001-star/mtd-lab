@@ -20,12 +20,13 @@ export default async function CalculationsPage({params,searchParams}:{params:Pro
   const qs=await searchParams
   const workspace=await currentWorkspace();if(!workspace)redirect('/login')
   const db=supabaseAdmin()
-  const [{data:taxpayer},{count:businessCount},{data:obligations},{data:submissions},{data:agentRows}]=await Promise.all([
+  const [{data:taxpayer},{count:businessCount},{data:obligations},{data:submissions},{data:agentRows},{data:relationshipRows}]=await Promise.all([
     db.from('taxpayers').select('display_name,nino').eq('id',id).eq('firm_id',workspace.firmId).maybeSingle(),
     db.from('hmrc_businesses').select('id',{count:'exact',head:true}).eq('taxpayer_id',id).eq('firm_id',workspace.firmId),
     db.from('hmrc_obligations').select('period_start,period_end,status').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).gte('period_start','2025-04-06'),
     db.from('hmrc_quarterly_submissions').select('tax_year,status').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).eq('status','submitted'),
-    db.from('mtd_agent_authorisations').select('agent_id,expires_at').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).eq('status','authorised').eq('can_submit_final_declaration',true)
+    db.from('mtd_agent_authorisations').select('agent_id,expires_at').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).eq('status','authorised').eq('can_submit_final_declaration',true),
+    db.from('mtd_submission_audit').select('acting_agent_id,status,request_summary,created_at').eq('taxpayer_id',id).eq('firm_id',workspace.firmId).eq('event_type','agent_relationship_check').order('created_at',{ascending:false})
   ])
   if(!taxpayer)redirect('/taxpayers')
   const finalAgentIds=Array.from(new Set((agentRows||[]).map((r:any)=>String(r.agent_id||'')).filter(Boolean)))
@@ -33,7 +34,8 @@ export default async function CalculationsPage({params,searchParams}:{params:Pro
   if(finalAgentRecordsError)throw finalAgentRecordsError
   const finalAgentById=new Map((finalAgentRecords||[]).map((agent:any)=>[String(agent.id),agent]))
   const finalAgentRows=(agentRows||[]).map((row:any)=>({...row,mtd_agents:finalAgentById.get(String(row.agent_id))||null}))
-  const finalAgents=finalAgentRows.filter((r:any)=>(!r.expires_at||new Date(r.expires_at).getTime()>Date.now())&&r.mtd_agents?.status==='active')
+  const latestRelationship=new Map<string,any>();for(const row of relationshipRows||[]){const key=String(row.acting_agent_id||'');if(key&&!latestRelationship.has(key))latestRelationship.set(key,row)}
+  const finalAgents=finalAgentRows.filter((r:any)=>{const check=latestRelationship.get(String(r.agent_id));return (!r.expires_at||new Date(r.expires_at).getTime()>Date.now())&&r.mtd_agents?.status==='active'&&check?.status==='accepted'&&check?.request_summary?.agentType==='main'})
   const selectedActingAgentId=finalAgents.some((r:any)=>String(r.agent_id)===String(qs.actingAgentId||''))?String(qs.actingAgentId):''
   const selectedAgent=selectedActingAgentId?finalAgents.find((r:any)=>String(r.agent_id)===selectedActingAgentId):null
   const years=Array.from(new Set([...(obligations||[]).map((o:any)=>taxYearFromDate(o.period_start)),...(submissions||[]).map((s:any)=>s.tax_year).filter(Boolean)])).sort().reverse()
@@ -59,7 +61,7 @@ export default async function CalculationsPage({params,searchParams}:{params:Pro
   const winterFuelCharge=winterFuelPaymentCharge(result)
 
   return <div className="shell"><TaxpayerSidebar taxpayerId={id} active="calculations"/><main className="main">
-    <div className="top"><div><h1 className="pageTitle">HMRC Tax Calculation</h1><p className="muted">Check HMRC's calculation before submitting the MTD for Income Tax return.</p></div><span className="badge">Individual Calculations API v8.0</span></div>
+    <div className="top"><div><h1 className="pageTitle">HMRC Tax Calculation</h1><p className="muted">Check HMRC's calculation before submitting the MTD for Income Tax return.</p></div><span className="badge">Individual Calculations API v9.0</span></div>
     {qs.error&&<div className="status statusError"><strong>HMRC calculation needs attention.</strong><div>{qs.error}</div>{qs.correlationId&&<div className="muted">HMRC correlation ID: {qs.correlationId}</div>}</div>}
     <section className="panel"><h2>Tax calculation</h2><p className="muted">MTD Lab displays HMRC's calculation and preserves the latest accepted HMRC result for the selected tax year.</p><form method="post" action="/api/hmrc/calculations/trigger"><input type="hidden" name="taxpayerId" value={id}/><input type="hidden" name="calculationType" value="in-year"/><label>Tax year</label><select className="selectField" name="taxYear" defaultValue={selected}>{years.length?years.map(y=><option key={y} value={y}>{y}</option>):<option value="2026-27">2026-27</option>}</select>{finalAgents.length>0&&<><label htmlFor="triggerActingAgentId">Acting as</label><select id="triggerActingAgentId" name="actingAgentId" className="selectField" defaultValue={selectedActingAgentId}><option value="">Taxpayer or direct operator</option>{finalAgents.map((r:any)=><option key={r.agent_id} value={r.agent_id}>{agentLabel(r)}</option>)}</select></>}<FraudContextFields/><button className="btn" type="submit" formMethod="post" formAction="/api/hmrc/calculations/trigger">Trigger HMRC tax calculation</button></form></section>
     <section className="panel" style={{marginTop:16}}><div className="sectionHead"><div><h2>HMRC calculation result</h2><p className="muted">Retrieve and check the completed calculation before declaration.</p></div>{calculationId&&<form method="post" action="/api/hmrc/calculations/retrieve"><input type="hidden" name="taxpayerId" value={id}/><input type="hidden" name="taxYear" value={selected}/><input type="hidden" name="calculationId" value={calculationId}/>{selectedActingAgentId&&<input type="hidden" name="actingAgentId" value={selectedActingAgentId}/>}<FraudContextFields/><button className="btn btnSmall" type="submit" formMethod="post" formAction="/api/hmrc/calculations/retrieve">Retrieve calculation</button></form>}</div>{calculationId?<div className="mono">Calculation ID: {calculationId}</div>:<p className="empty">Trigger a calculation to create an HMRC calculation ID.</p>}{(selectedAgent||storedAgent)&&<div className="status" style={{marginTop:14}}><strong>Acting capacity</strong><div>{agentLabel(selectedAgent||storedAgent)}</div></div>}{result&&<>
